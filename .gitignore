@@ -1,2 +1,7 @@
 df_all_8.csv
 merged_output.csv
+.cache
+.ipython
+.jupyter
+.local
+.pynb_checkpoints
