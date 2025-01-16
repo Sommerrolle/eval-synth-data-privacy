@@ -5,3 +5,4 @@ merged_output.csv
 .jupyter
 .local
 .pynb_checkpoints
+*_merged
