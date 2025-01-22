@@ -1,5 +1,7 @@
 import dask.dataframe as dd
+import io
 import pandas as pd
+import chardet
 
 def rename_columns(df, prefix, exceptions=None, dataset_type=None):
     """
@@ -32,21 +34,22 @@ def rename_columns(df, prefix, exceptions=None, dataset_type=None):
     return df
 
 # Define base path for the input CSV files
-base_path = 'testdata'
+base_path = '/home/cvt/Documents/masterarbeit/claims_data'
 
 # Define file paths for the input CSV files
 file_paths = {
-    'insurance_data': f'{base_path}/test.insurance_data.csv',
-    'insurants': f'{base_path}/test.insurants.csv',
-    'inpatient_cases': f'{base_path}/test.inpatient_cases.csv',
-    'inpatient_diagnosis': f'{base_path}/test.inpatient_diagnosis.csv',
-    'inpatient_procedures': f'{base_path}/test.inpatient_procedures.csv',
-    'inpatient_fees': f'{base_path}/test.inpatient_fees.csv',
-    'outpatient_cases': f'{base_path}/test.outpatient_cases.csv',
-    'outpatient_diagnosis': f'{base_path}/test.outpatient_diagnosis.csv',
-    'outpatient_fees': f'{base_path}/test.outpatient_fees.csv',
-    'outpatient_procedures': f'{base_path}/test.outpatient_procedures.csv',
-    'drugs': f'{base_path}/test.drugs.csv'
+    'insurance_data': f'{base_path}/sle.insurance_data.csv',
+    'insurants': f'{base_path}/sle.insurants_500.csv',
+    #'insurants': f'{base_path}/sle.insurants.csv',
+    'inpatient_cases': f'{base_path}/sle.inpatient_cases.csv',
+    'inpatient_diagnosis': f'{base_path}/sle.inpatient_diagnosis.csv',
+    'inpatient_procedures': f'{base_path}/sle.inpatient_procedures.csv',
+    'inpatient_fees': f'{base_path}/sle.inpatient_fees.csv',
+    'outpatient_cases': f'{base_path}/sle.outpatient_cases.csv',
+    'outpatient_diagnosis': f'{base_path}/sle.outpatient_diagnosis.csv',
+    'outpatient_fees': f'{base_path}/sle.outpatient_fees.csv',
+    'outpatient_procedures': f'{base_path}/sle.outpatient_procedures.csv',
+    'drugs': f'{base_path}/sle.drugs.csv'
 }
 
 # Define dtypes for each file
@@ -58,8 +61,8 @@ dtypes = {
     },
     'insurants': {
         'pid': int,
-        'year_of_birth': int,
-        'gender': int,
+        'year_of_birth': 'Int64',
+        'gender': 'Int64',
     },
     'inpatient_cases': {
         'pid': int,
@@ -142,6 +145,22 @@ parse_dates = {
     'drugs': ['date of prescription', 'date of dispense']
 }
 
+def read_data(filename, col_types, table_name):
+
+    try:
+        # try reading in the data with pandas
+        df = pd.read_csv(filename,
+                         dtype=col_types,
+                         sep='\t',
+                         encoding='utf-8',
+                         on_bad_lines='warn',
+                         parse_dates=parse_dates.get(table_name, None),
+                         encoding_errors='replace')
+        return df
+    except Exception as e:
+        print(f"Error reading in {filename}: {e}")
+
+
 def main():
     # Read and process each CSV
     dataframes = {}
@@ -149,20 +168,16 @@ def main():
         # Determine dataset type
         dataset_type = "inpatient" if "inpatient" in table_name else "outpatient" if "outpatient" in table_name else None
 
-        # Read CSV
-        df = dd.read_csv(
-            file_path,
-            sep='\t',
-            dtype=dtypes.get(table_name, None),
-            parse_dates=parse_dates.get(table_name, None),
-            assume_missing=True
-        )
+        pandas_df = read_data(file_path, dtypes.get(table_name, None), table_name)
+        df = dd.from_pandas(pandas_df, npartitions=1)
 
         # Rename columns
         df = rename_columns(df, prefix=table_name, exceptions=['pid'], dataset_type=dataset_type)
 
         # Store the processed DataFrame
         dataframes[table_name] = df
+        # Debug print
+        print(f'Done processing {table_name}')
 
     # Merge datasets step by step
     # Example: Merging 'insurance_data' with 'insurants'
@@ -189,6 +204,9 @@ def main():
 
     df_result = df_merged.compute()
     df_result
+
+    print('Save to .csv')
+    df_result.to_csv('500_merged.csv')
 
 if __name__ == "__main__":
     main()
