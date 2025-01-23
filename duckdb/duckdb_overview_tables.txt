@@ -1,0 +1,96 @@
+Tables and their columns:
+
+Table: drugs
+  - pid: BIGINT
+  - drugs_date_of_prescription: TIMESTAMP_NS
+  - drugs_date_of_dispense: TIMESTAMP_NS
+  - drugs_pharma_central_number: VARCHAR
+  - drugs_specialty_of_prescriber: VARCHAR
+  - drugs_physican_code: VARCHAR
+  - drugs_practice_code: VARCHAR
+  - drugs_quantity: DOUBLE
+  - drugs_amount_due: DOUBLE
+  - drugs_atc: VARCHAR
+  - drugs_ddd: DOUBLE
+
+Table: inpatient_cases
+  - pid: BIGINT
+  - inpatient_caseID: BIGINT
+  - inpatient_cases_date_of_admission: TIMESTAMP_NS
+  - inpatient_cases_date_of_discharge: TIMESTAMP_NS
+  - inpatient_cases_cause_of_admission: VARCHAR
+  - inpatient_cases_cause_of_discharge: VARCHAR
+  - inpatient_cases_outpatient_treatment: BIGINT
+  - inpatient_cases_department_admission: VARCHAR
+  - inpatient_cases_department_discharge: VARCHAR
+
+Table: inpatient_diagnosis
+  - pid: BIGINT
+  - inpatient_caseID: BIGINT
+  - inpatient_diagnosis_diagnosis: VARCHAR
+  - inpatient_diagnosis_type_of_diagnosis: VARCHAR
+  - inpatient_diagnosis_is_main_diagnosis: BIGINT
+  - inpatient_diagnosis_localisation: BIGINT
+
+Table: inpatient_fees
+  - pid: BIGINT
+  - inpatient_caseID: BIGINT
+  - inpatient_fees_from: VARCHAR
+  - inpatient_fees_to: VARCHAR
+  - inpatient_fees_billing_code: VARCHAR
+  - inpatient_fees_amount_due: DOUBLE
+  - inpatient_fees_quantity: BIGINT
+
+Table: inpatient_procedures
+  - pid: BIGINT
+  - inpatient_caseID: BIGINT
+  - inpatient_procedures_procedure_code: VARCHAR
+  - inpatient_procedures_localisation: BIGINT
+  - inpatient_procedures_date_of_procedure: TIMESTAMP_NS
+
+Table: insurance_data
+  - pid: BIGINT
+  - insurance_data_from: TIMESTAMP_NS
+  - insurance_data_to: TIMESTAMP_NS
+  - insurance_data_death: BIGINT
+  - insurance_data_regional_code: BIGINT
+
+Table: insurants
+  - pid: BIGINT
+  - insurants_year_of_birth: BIGINT
+  - insurants_gender: BIGINT
+
+Table: outpatient_cases
+  - pid: BIGINT
+  - outpatient_caseID: BIGINT
+  - outpatient_cases_practice_code: VARCHAR
+  - outpatient_cases_from: TIMESTAMP_NS
+  - outpatient_cases_to: TIMESTAMP_NS
+  - outpatient_cases_amount_due: DOUBLE
+  - outpatient_cases_year: BIGINT
+  - outpatient_cases_quarter: BIGINT
+
+Table: outpatient_diagnosis
+  - pid: BIGINT
+  - outpatient_caseID: BIGINT
+  - outpatient_diagnosis_diagnosis: VARCHAR
+  - outpatient_diagnosis_qualification: VARCHAR
+  - outpatient_diagnosis_localisation: BIGINT
+
+Table: outpatient_fees
+  - pid: BIGINT
+  - outpatient_caseID: BIGINT
+  - outpatient_fees_physican_code: VARCHAR
+  - outpatient_fees_specialty_code: VARCHAR
+  - outpatient_fees_billing_code: VARCHAR
+  - outpatient_fees_quantity: BIGINT
+  - outpatient_fees_date: VARCHAR
+
+Table: outpatient_procedures
+  - pid: BIGINT
+  - outpatient_caseID: BIGINT
+  - outpatient_procedures_procedure_code: VARCHAR
+  - outpatient_procedures_date_of_procedure: VARCHAR
+  - outpatient_procedures_localisation: BIGINT
+  - outpatient_procedures_specialty_code: DOUBLE
+  - outpatient_procedures_physican_code: DOUBLE

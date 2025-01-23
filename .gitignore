@@ -6,3 +6,5 @@ merged_output.csv
 .local
 .pynb_checkpoints
 *_merged
+
+claims_data.duckdb
