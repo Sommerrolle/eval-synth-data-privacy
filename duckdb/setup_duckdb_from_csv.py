@@ -5,7 +5,9 @@ from typing import List, Dict, Tuple
 
 # Define base path for the input CSV files
 # base_path = '/home/cvt/Documents/masterarbeit/claims_data'
-testdata_path = 'D:\Benutzer\Cuong.VoTa\datasets\claims_data'
+# testdata_path = 'D:\Benutzer\Cuong.VoTa\datasets\claims_data'
+testdata_path = 'D:\Benutzer\Cuong.VoTa\datasets\limebit_mtgan'
+
 
 # Define file paths for the input CSV files
 file_paths = {
@@ -280,6 +282,84 @@ def sort_tables_by_pid(database_path):
     con.close()
     print("All tables have been sorted by 'pid' and updated in the database.")
 
+def create_database_from_csvs(testdata_path: str) -> str:
+    """
+    Creates a DuckDB database from CSV files in the specified directory.
+    
+    Args:
+        testdata_path (str): Path to the directory containing CSV files
+        
+    Returns:
+        str: Path to the created database file
+    """
+    # Extract the directory name for the database name
+    db_name = os.path.basename(os.path.normpath(testdata_path))
+    
+    # Create duckdb directory if it doesn't exist
+    os.makedirs('duckdb', exist_ok=True)
+    
+    # Set the database path
+    db_path = f'duckdb/{db_name}.duckdb'
+    
+    # Create file_paths dictionary by scanning the directory
+    file_paths = {}
+    for file in os.listdir(testdata_path):
+        if file.endswith('.csv'):
+            # Extract table name from filename (remove 'sle.' prefix and '.csv' suffix)
+            table_name = file.replace('sle.', '').replace('.csv', '')
+            file_paths[table_name] = os.path.join(testdata_path, file)
+    
+    # Print debug info
+    print(f"Found {len(file_paths)} CSV files in {testdata_path}")
+    for table, path in file_paths.items():
+        print(f"- {table}: {path}")
+    
+    # Define DuckDB connection
+    con = duckdb.connect(database=db_path, read_only=False)
+    
+    try:
+        # Process and create tables
+        for table_name, file_path in file_paths.items():
+            print(f"\nProcessing table: {table_name}")
+            
+            # Determine dataset type
+            dataset_type = ("inpatient" if "inpatient" in table_name 
+                          else "outpatient" if "outpatient" in table_name 
+                          else None)
+            
+            # Read the CSV data
+            pandas_df = read_data(file_path, dtypes.get(table_name, None), 
+                                table_name, parse_dates)
+            
+            if pandas_df is None or len(pandas_df) == 0:
+                print(f"Warning: No data read from {file_path}")
+                continue
+                
+            # Rename columns
+            renamed_df = rename_columns(pandas_df, prefix=table_name, 
+                                     exceptions=['pid'], dataset_type=dataset_type)
+            
+            # Create a DuckDB table
+            con.execute(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM renamed_df")
+            
+            # Print debug info
+            print(f"Table '{table_name}' created in DuckDB with {len(renamed_df)} rows.")
+    
+    except Exception as e:
+        print(f"Error during database creation: {str(e)}")
+        raise
+    
+    finally:
+        # Close the connection
+        con.close()
+    
+    print(f"\nAll tables have been created in {db_path}")
+    
+    # Sort tables by pid
+    sort_tables_by_pid(db_path)
+    
+    return db_path
+
 
 def chunkwise_join_and_save(db_path, keys, output_table, chunk_size=200000):
     """
@@ -442,7 +522,8 @@ def perform_join(db_path: str, selected_tables: List[str], chunk_size: int = 200
 
 
 def main():
-    db_path = 'duckdb/claims_data.duckdb'
+    #db_path = 'duckdb/claims_data.duckdb'
+    db_path = 'duckdb/limebit_mtgan.duckdb'
     
     print("Welcome to the Interactive Table Join Tool")
     print("========================================")
@@ -464,70 +545,17 @@ def main():
     print("\nThank you for using the Interactive Table Join Tool!")
 
 
-# def main():
-#     # Path to the DuckDB database
-#     db_path = 'duckdb/claims_data.duckdb'
+def main2():
+    # Example usage with different paths
+    original_path = 'D:\Benutzer\Cuong.VoTa\datasets\claims_data'
+    new_path = 'D:\Benutzer\Cuong.VoTa\datasets\limebit_mtgan'
+    
+    # Create database for new data
+    print("Creating database for limebit MTGAN data...")
+    db_path2 = create_database_from_csvs(new_path)
+    print(f"Database created at: {db_path2}")
 
-#     ##############################
-#     ##### Working code ###########
-#     ##############################
-
-#     # # Define DuckDB connection
-#     # con = duckdb.connect(database=db_path, read_only=False)
-
-#     # # Process and create tables
-#     # for table_name, file_path in file_paths.items():
-#     #     # Determine dataset type
-#     #     dataset_type = "inpatient" if "inpatient" in table_name else "outpatient" if "outpatient" in table_name else None
-
-#     #     # Read the CSV data
-#     #     pandas_df = read_data(file_path, dtypes.get(table_name, None), table_name, parse_dates)
-
-#     #     # Rename columns
-#     #     renamed_df = rename_columns(pandas_df, prefix=table_name, exceptions=['pid'], dataset_type=dataset_type)
-
-#     #     # Create a DuckDB table
-#     #     con.execute(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM renamed_df")
-
-#     #     # Print debug info
-#     #     print(f"Table '{table_name}' created in DuckDB with {len(renamed_df)} rows.")
-
-#     # # Close the connection
-#     # con.close()
-#     # print("All tables have been created in DuckDB.")
-
-#     # Sorting all tables by pid
-#     # sort_tables_by_pid('claims_data.duckdb')
-
-#     ##############################
-#     ##### End of working code ####
-#     ##############################
-
-#     # Define keys for joining
-#     # keys = {
-#     #     'insurance_data': ['pid'],
-#     #     'drugs': ['pid']
-#         # 'inpatient_cases': ['pid'],
-#         # 'inpatient_diagnosis': ['pid', 'inpatient_caseID'],
-#         # 'inpatient_procedures': ['pid', 'inpatient_caseID'],
-#         # 'inpatient_fees': ['pid', 'inpatient_caseID'],
-#         # 'outpatient_cases': ['pid'],
-#         # 'outpatient_diagnosis': ['pid', 'outpatient_caseID'],
-#         # 'outpatient_procedures': ['pid', 'outpatient_caseID'],
-#         # 'outpatient_fees': ['pid', 'outpatient_caseID'],
-#     }
-
-#     # Output table name
-#     output_table = 'joined_data'
-
-#     # Chunk size
-#     chunk_size = 200
-
-#     # Run the pipeline
-#     # took too long
-#     # chunkwise_join_and_save(db_path, keys, output_table, chunk_size)
-
-#     explain_join(db_path, keys)
 
 if __name__ == "__main__":
     main()
+    #main2()
