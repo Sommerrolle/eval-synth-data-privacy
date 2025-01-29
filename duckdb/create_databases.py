@@ -1,7 +1,7 @@
 import os
 import duckdb
 import pandas as pd
-from typing import Dict, List
+from typing import Dict, List, Set
 import logging
 from pathlib import Path
 
@@ -133,17 +133,60 @@ def rename_columns(df: pd.DataFrame, prefix: str, exceptions: List[str] = None,
     return df.rename(columns=rename_column)
 
 def read_csv_file(filepath: str, col_types: Dict, table_name: str) -> pd.DataFrame:
-    """Read a CSV file with proper error handling."""
+    """Read a CSV file with consistent handling of missing values across datasets."""
     try:
+        # First read without dtype specification to check the data
         df = pd.read_csv(
             filepath,
-            dtype=col_types,
             sep='\t',
             encoding='utf-8',
             on_bad_lines='warn',
             parse_dates=PARSE_DATES.get(table_name, None),
             encoding_errors='replace'
         )
+        
+        # Handle numeric columns consistently across all tables
+        numeric_columns = {
+            'amount due': 0.0,  # Replace NaN with 0.0 for all amount columns
+            'quantity': 0,      # Replace NaN with 0 for all quantity columns
+            'ddd': 0.0,        # Replace NaN with 0.0 for Defined Daily Dose
+        }
+        
+        for col in df.columns:
+            col_lower = col.lower()
+            
+            # Handle amount columns
+            if 'amount' in col_lower:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
+            
+            # Handle quantity columns
+            elif 'quantity' in col_lower:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype('Int64')
+            
+            # Handle DDD (Defined Daily Dose)
+            elif col_lower == 'ddd':
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
+            
+            # Handle categorical columns (keep NaN)
+            elif col in ['diagnosis', 'procedure_code', 'atc', 'billing_code', 
+                        'physican_code', 'practice_code', 'specialty_code']:
+                # Convert to string but keep NaN as NaN
+                df[col] = df[col].astype(str).replace('nan', pd.NA)
+            
+            # Apply original dtype if specified
+            elif col_types and col in col_types:
+                try:
+                    df[col] = pd.to_numeric(df[col], errors='coerce').astype(col_types[col])
+                except Exception as type_error:
+                    logging.warning(f"Could not convert column {col} to {col_types[col]} in {filepath}. Error: {str(type_error)}")
+        
+        # Log the number of NaN values in each column
+        nan_counts = df.isna().sum()
+        if nan_counts.any():
+            logging.info(f"NaN counts in {table_name}:")
+            for col, count in nan_counts[nan_counts > 0].items():
+                logging.info(f"{col}: {count} NaN values")
+        
         return df
     except Exception as e:
         logging.error(f"Error reading {filepath}: {str(e)}")
@@ -245,19 +288,120 @@ def process_all_datasets(base_dir: str, force_recreate: bool = False) -> Dict[st
     
     return database_paths
 
+
+def get_existing_databases(duckdb_dir: str = DUCKDB_DIR) -> Set[str]:
+    """Get set of existing database names (without .duckdb extension)."""
+    duckdb_path = Path(duckdb_dir)
+    if not duckdb_path.exists():
+        return set()
+    return {f.stem for f in duckdb_path.glob('*.duckdb')}
+
+def display_directory_options(base_dir: str, existing_dbs: Set[str]) -> Dict[int, str]:
+    """Display available directories with their status."""
+    subdirs = [d for d in os.listdir(base_dir) 
+              if os.path.isdir(os.path.join(base_dir, d))]
+    
+    print("\nAvailable directories:")
+    print("-" * 60)
+    print(f"{'#':<4} {'Directory':<30} {'Status':<20}")
+    print("-" * 60)
+    
+    options = {}
+    for i, subdir in enumerate(subdirs, 1):
+        status = "Exists" if subdir in existing_dbs else "Not created"
+        print(f"{i:<4} {subdir:<30} {status:<20}")
+        options[i] = subdir
+    print("-" * 60)
+    
+    return options
+
+def get_user_selection(options: Dict[int, str]) -> List[str]:
+    """Get user selection of directories to process."""
+    while True:
+        print("\nEnter the numbers of directories to process (space-separated)")
+        print("Or enter 'all' to process all directories")
+        choice = input("> ").strip().lower()
+        
+        if choice == 'all':
+            return list(options.values())
+            
+        try:
+            numbers = [int(x) for x in choice.split()]
+            if all(n in options for n in numbers):
+                return [options[n] for n in numbers]
+            print("Invalid numbers. Please try again.")
+        except ValueError:
+            print("Invalid input. Please enter numbers or 'all'")
+
+def get_force_recreate_choice(selected_dirs: List[str], existing_dbs: Set[str]) -> Dict[str, bool]:
+    """Get force_recreate choice for each selected directory."""
+    force_choices = {}
+    
+    for directory in selected_dirs:
+        if directory in existing_dbs:
+            print(f"\nDatabase for '{directory}' already exists.")
+            while True:
+                choice = input("Recreate it? (y/n): ").lower()
+                if choice in ('y', 'n'):
+                    force_choices[directory] = (choice == 'y')
+                    break
+                print("Please enter 'y' or 'n'")
+        else:
+            force_choices[directory] = False
+    
+    return force_choices
+
+def process_selected_datasets(base_dir: str, selected_dirs: List[str], 
+                            force_choices: Dict[str, bool]) -> Dict[str, str]:
+    """Process selected dataset directories with specified force_recreate choices."""
+    database_paths = {}
+    
+    for directory in selected_dirs:
+        full_path = os.path.join(base_dir, directory)
+        logging.info(f"\nProcessing dataset directory: {directory}")
+        
+        db_path = create_database(full_path, force_choices.get(directory, False))
+        if db_path:
+            database_paths[directory] = db_path
+            logging.info(f"Successfully created/updated database for {directory} at {db_path}")
+        else:
+            logging.warning(f"Failed to create database for {directory}")
+    
+    return database_paths
+
 def main():
-    """Main function to process all datasets."""
+    """Main function with interactive directory selection."""
     # Specify your base directory containing all dataset folders
     base_dir = 'D:/Benutzer/Cuong.VoTa/datasets'
     
-    # Process all datasets
-    logging.info("Starting database creation process...")
-    database_paths = process_all_datasets(base_dir, force_recreate=False)
+    # Get existing databases
+    existing_dbs = get_existing_databases()
+    
+    # Display options and get user selection
+    options = display_directory_options(base_dir, existing_dbs)
+    if not options:
+        logging.error("No directories found in base directory")
+        return
+    
+    # Get user selection
+    selected_dirs = get_user_selection(options)
+    if not selected_dirs:
+        logging.error("No directories selected")
+        return
+    
+    # Get force_recreate choices
+    force_choices = get_force_recreate_choice(selected_dirs, existing_dbs)
+    
+    # Process selected datasets
+    logging.info("\nStarting database creation process...")
+    database_paths = process_selected_datasets(base_dir, selected_dirs, force_choices)
     
     # Print summary
-    logging.info("\nDatabase Creation Summary:")
+    print("\nDatabase Creation Summary:")
+    print("-" * 60)
     for dataset, path in database_paths.items():
-        logging.info(f"{dataset}: {path}")
+        print(f"{dataset}: {path}")
+    print("-" * 60)
 
 if __name__ == "__main__":
     main()

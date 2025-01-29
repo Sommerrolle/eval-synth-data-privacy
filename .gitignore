@@ -8,3 +8,4 @@ merged_output.csv
 *_merged
 
 *.duckdb
+*.log
