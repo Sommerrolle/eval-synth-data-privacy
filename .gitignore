@@ -8,3 +8,4 @@ merged_output.csv
 *_merged
 
 claims_data.duckdb
+claims_data copy.duckdb

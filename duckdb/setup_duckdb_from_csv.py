@@ -1,6 +1,7 @@
 import duckdb
 import os
 import pandas as pd
+from typing import List, Dict, Tuple
 
 # Define base path for the input CSV files
 # base_path = '/home/cvt/Documents/masterarbeit/claims_data'
@@ -115,6 +116,83 @@ parse_dates = {
     'outpatient_fees': ['date'],
     'drugs': ['date of prescription', 'date of dispense']
 }
+
+# Table mapping for naming convention
+TABLE_MAPPING = {
+    'insurants': 1,
+    'insurance_data': 2,
+    'drugs': 3,
+    'inpatient_cases': 4,
+    'inpatient_diagnosis': 5,
+    'inpatient_procedures': 6,
+    'inpatient_fees': 7,
+    'outpatient_cases': 8,
+    'outpatient_diagnosis': 9,
+    'outpatient_procedures': 10,
+    'outpatient_fees': 11
+}
+
+def display_table_options():
+    """Display available tables with their corresponding numbers."""
+    print("\nAvailable tables:")
+    print("-" * 40)
+    for table_name, number in TABLE_MAPPING.items():
+        print(f"{number}. {table_name}")
+    print("-" * 40)
+
+
+def get_user_selection() -> List[str]:
+    """Get user input for table selection."""
+    while True:
+        try:
+            print("\nEnter the numbers of the tables you want to join (separated by spaces):")
+            numbers = input("> ").strip().split()
+            numbers = [int(n) for n in numbers]
+            
+            # Validate input
+            if not all(1 <= n <= 11 for n in numbers):
+                print("Error: Please enter numbers between 1 and 11.")
+                continue
+                
+            # Convert numbers back to table names
+            reverse_mapping = {v: k for k, v in TABLE_MAPPING.items()}
+            selected_tables = [reverse_mapping[n] for n in numbers]
+            
+            if 'insurants' not in selected_tables:
+                print("Warning: 'insurants' (1) should typically be included as it's the primary table.")
+                if input("Do you want to continue anyway? (y/n): ").lower() != 'y':
+                    continue
+            
+            return selected_tables
+            
+        except ValueError:
+            print("Error: Please enter valid numbers separated by spaces.")
+
+
+def get_join_keys(selected_tables: List[str]) -> Dict[str, List[str]]:
+    """Create a dictionary of join keys for selected tables."""
+    keys = {
+        'insurants': ['pid'],
+        'insurance_data': ['pid'],
+        'drugs': ['pid'],
+        'inpatient_cases': ['pid'],
+        'inpatient_diagnosis': ['pid', 'inpatient_caseID'],
+        'inpatient_procedures': ['pid', 'inpatient_caseID'],
+        'inpatient_fees': ['pid', 'inpatient_caseID'],
+        'outpatient_cases': ['pid'],
+        'outpatient_diagnosis': ['pid', 'outpatient_caseID'],
+        'outpatient_procedures': ['pid', 'outpatient_caseID'],
+        'outpatient_fees': ['pid', 'outpatient_caseID']
+    }
+    return {table: keys[table] for table in selected_tables}
+
+
+def generate_output_table_name(selected_tables: List[str]) -> str:
+    """Generate the output table name based on selected tables."""
+    # Get numbers and sort them numerically
+    numbers = [TABLE_MAPPING[table] for table in selected_tables]
+    sorted_numbers = sorted(numbers)  # Simple numerical sort
+    return 'joined_' + '_'.join(str(n) for n in sorted_numbers)
 
 
 def rename_columns(df, prefix, exceptions=None, dataset_type=None):
@@ -345,70 +423,111 @@ def explain_join(db_path, keys, primary_table='insurants'):
     con.close()
 
 
-def main():
-    # Path to the DuckDB database
-    db_path = 'duckdb/claims_data.duckdb'
-
-    ##############################
-    ##### Working code ###########
-    ##############################
-
-    # # Define DuckDB connection
-    # con = duckdb.connect(database=db_path, read_only=False)
-
-    # # Process and create tables
-    # for table_name, file_path in file_paths.items():
-    #     # Determine dataset type
-    #     dataset_type = "inpatient" if "inpatient" in table_name else "outpatient" if "outpatient" in table_name else None
-
-    #     # Read the CSV data
-    #     pandas_df = read_data(file_path, dtypes.get(table_name, None), table_name, parse_dates)
-
-    #     # Rename columns
-    #     renamed_df = rename_columns(pandas_df, prefix=table_name, exceptions=['pid'], dataset_type=dataset_type)
-
-    #     # Create a DuckDB table
-    #     con.execute(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM renamed_df")
-
-    #     # Print debug info
-    #     print(f"Table '{table_name}' created in DuckDB with {len(renamed_df)} rows.")
-
-    # # Close the connection
-    # con.close()
-    # print("All tables have been created in DuckDB.")
-
-    # Sorting all tables by pid
-    # sort_tables_by_pid('claims_data.duckdb')
-
-    ##############################
-    ##### End of working code ####
-    ##############################
-
-    # Define keys for joining
-    keys = {
-        'insurance_data': ['pid'],
-        'inpatient_cases': ['pid'],
-        'inpatient_diagnosis': ['pid', 'inpatient_caseID'],
-        'inpatient_procedures': ['pid', 'inpatient_caseID'],
-        'inpatient_fees': ['pid', 'inpatient_caseID'],
-        'outpatient_cases': ['pid'],
-        'outpatient_diagnosis': ['pid', 'outpatient_caseID'],
-        'outpatient_procedures': ['pid', 'outpatient_caseID'],
-        'outpatient_fees': ['pid', 'outpatient_caseID'],
-        'drugs': ['pid']
-    }
-
-    # Output table name
-    output_table = 'joined_data'
-
-    # Chunk size
-    chunk_size = 200
-
-    # Run the pipeline
-    # took too long
-    # chunkwise_join_and_save(db_path, keys, output_table, chunk_size)
-
+def perform_join(db_path: str, selected_tables: List[str], chunk_size: int = 200000) -> None:
+    """Perform the join operation with the selected tables."""
+    keys = get_join_keys(selected_tables)
+    output_table = generate_output_table_name(selected_tables)
+    
+    # First explain the join
+    print("\nAnalyzing join complexity...")
     explain_join(db_path, keys)
+    
+    # Ask for confirmation
+    if input("\nDo you want to proceed with the join? (y/n): ").lower() != 'y':
+        print("Join operation cancelled.")
+        return
+    
+    print(f"\nProceeding with join operation. Output table will be: {output_table}")
+    chunkwise_join_and_save(db_path, keys, output_table, chunk_size)
+
+
+def main():
+    db_path = 'duckdb/claims_data.duckdb'
+    
+    print("Welcome to the Interactive Table Join Tool")
+    print("========================================")
+    
+    while True:
+        display_table_options()
+        selected_tables = get_user_selection()
+        
+        print("\nYou selected the following tables:")
+        for table in selected_tables:
+            print(f"- {table}")
+        
+        if input("\nConfirm selection? (y/n): ").lower() == 'y':
+            perform_join(db_path, selected_tables)
+        
+        if input("\nDo you want to create another joined table? (y/n): ").lower() != 'y':
+            break
+    
+    print("\nThank you for using the Interactive Table Join Tool!")
+
+
+# def main():
+#     # Path to the DuckDB database
+#     db_path = 'duckdb/claims_data.duckdb'
+
+#     ##############################
+#     ##### Working code ###########
+#     ##############################
+
+#     # # Define DuckDB connection
+#     # con = duckdb.connect(database=db_path, read_only=False)
+
+#     # # Process and create tables
+#     # for table_name, file_path in file_paths.items():
+#     #     # Determine dataset type
+#     #     dataset_type = "inpatient" if "inpatient" in table_name else "outpatient" if "outpatient" in table_name else None
+
+#     #     # Read the CSV data
+#     #     pandas_df = read_data(file_path, dtypes.get(table_name, None), table_name, parse_dates)
+
+#     #     # Rename columns
+#     #     renamed_df = rename_columns(pandas_df, prefix=table_name, exceptions=['pid'], dataset_type=dataset_type)
+
+#     #     # Create a DuckDB table
+#     #     con.execute(f"CREATE TABLE IF NOT EXISTS {table_name} AS SELECT * FROM renamed_df")
+
+#     #     # Print debug info
+#     #     print(f"Table '{table_name}' created in DuckDB with {len(renamed_df)} rows.")
+
+#     # # Close the connection
+#     # con.close()
+#     # print("All tables have been created in DuckDB.")
+
+#     # Sorting all tables by pid
+#     # sort_tables_by_pid('claims_data.duckdb')
+
+#     ##############################
+#     ##### End of working code ####
+#     ##############################
+
+#     # Define keys for joining
+#     # keys = {
+#     #     'insurance_data': ['pid'],
+#     #     'drugs': ['pid']
+#         # 'inpatient_cases': ['pid'],
+#         # 'inpatient_diagnosis': ['pid', 'inpatient_caseID'],
+#         # 'inpatient_procedures': ['pid', 'inpatient_caseID'],
+#         # 'inpatient_fees': ['pid', 'inpatient_caseID'],
+#         # 'outpatient_cases': ['pid'],
+#         # 'outpatient_diagnosis': ['pid', 'outpatient_caseID'],
+#         # 'outpatient_procedures': ['pid', 'outpatient_caseID'],
+#         # 'outpatient_fees': ['pid', 'outpatient_caseID'],
+#     }
+
+#     # Output table name
+#     output_table = 'joined_data'
+
+#     # Chunk size
+#     chunk_size = 200
+
+#     # Run the pipeline
+#     # took too long
+#     # chunkwise_join_and_save(db_path, keys, output_table, chunk_size)
+
+#     explain_join(db_path, keys)
 
 if __name__ == "__main__":
     main()
