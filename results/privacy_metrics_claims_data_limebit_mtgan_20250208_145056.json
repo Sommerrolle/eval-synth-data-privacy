@@ -1,0 +1,200 @@
+{
+  "database1": "claims_data.duckdb",
+  "database2": "limebit_mtgan.duckdb",
+  "comparisons": [
+    {
+      "table_name": "joined_1_4_5_6_7",
+      "quasi_identifiers": [
+        "insurants_year_of_birth",
+        "insurants_gender",
+        "inpatient_cases_date_of_admission",
+        "inpatient_cases_department_admission"
+      ],
+      "sensitive_attributes": [
+        "inpatient_diagnosis_diagnosis",
+        "inpatient_procedure_procedure_code",
+        "outpatient_diagnosis_diagnosis",
+        "outpatient_procedure_procedure_code"
+      ],
+      "dataset1_results": {
+        "k_anonymity": 1,
+        "average_group_size": 1164.9551931270516,
+        "total_groups": 28634,
+        "unique_records": 2106,
+        "vulnerable_groups": 4785,
+        "high_risk_percentage": 0.006122967504050797,
+        "group_size_distribution": {
+          "groups_of_size_1": 2106,
+          "groups_of_size_2": 1484,
+          "groups_of_size_3": 617,
+          "groups_of_size_4": 578,
+          "groups_of_size_5": 391,
+          "groups_of_size_6": 512,
+          "groups_of_size_7": 284,
+          "groups_of_size_8": 408,
+          "groups_of_size_9": 290,
+          "groups_of_size_10": 347,
+          "groups_larger_than_10": 21617
+        },
+        "entropy": 10.685589324399407,
+        "total_records": 34395087,
+        "privacy_score": 99.99387703249594,
+        "l_diversity": {
+          "inpatient_diagnosis_diagnosis": {
+            "l_diversity": 1,
+            "average_distinct_values": 7.503038346022211,
+            "entropy_l_diversity": -0.0,
+            "average_entropy": 2.2549930701408636
+          }
+        },
+        "t_closeness": {
+          "inpatient_diagnosis_diagnosis": {
+            "t_closeness": 0.9990363508329588,
+            "average_distance": 0.44122095142786427,
+            "groups_violating_t": 28182,
+            "total_groups": 28634
+          }
+        }
+      },
+      "dataset2_results": {
+        "k_anonymity": 1,
+        "average_group_size": 396.15700293129333,
+        "total_groups": 13987,
+        "unique_records": 3,
+        "vulnerable_groups": 107,
+        "high_risk_percentage": 3.743601716715918e-05,
+        "group_size_distribution": {
+          "groups_of_size_1": 3,
+          "groups_of_size_2": 11,
+          "groups_of_size_3": 30,
+          "groups_of_size_4": 63,
+          "groups_of_size_5": 125,
+          "groups_of_size_6": 203,
+          "groups_of_size_7": 321,
+          "groups_of_size_8": 414,
+          "groups_of_size_9": 501,
+          "groups_of_size_10": 596,
+          "groups_larger_than_10": 11720
+        },
+        "entropy": 6.091291066033114,
+        "total_records": 8013673,
+        "privacy_score": 99.99996256398283,
+        "l_diversity": {
+          "inpatient_diagnosis_diagnosis": {
+            "l_diversity": 1,
+            "average_distinct_values": 19.725745334953885,
+            "entropy_l_diversity": -0.0,
+            "average_entropy": 4.00132343116686
+          }
+        },
+        "t_closeness": {
+          "inpatient_diagnosis_diagnosis": {
+            "t_closeness": 0.9340287836862412,
+            "average_distance": 0.2377530598053788,
+            "groups_violating_t": 11747,
+            "total_groups": 13987
+          }
+        }
+      },
+      "timestamp": "2025-02-07T20:01:59.094457"
+    },
+    {
+      "table_name": "joined_1_8_9_10_11",
+      "quasi_identifiers": [
+        "insurants_year_of_birth",
+        "insurants_gender",
+        "outpatient_cases_from",
+        "outpatient_cases_practice_code",
+        "outpatient_cases_year",
+        "outpatient_cases_quarter"
+      ],
+      "sensitive_attributes": [
+        "inpatient_diagnosis_diagnosis",
+        "inpatient_procedure_procedure_code",
+        "outpatient_diagnosis_diagnosis",
+        "outpatient_procedure_procedure_code"
+      ],
+      "dataset1_results": {
+        "k_anonymity": 1,
+        "average_group_size": 44.59660893521558,
+        "total_groups": 766249,
+        "unique_records": 10606,
+        "vulnerable_groups": 140466,
+        "high_risk_percentage": 0.0310353499248872,
+        "group_size_distribution": {
+          "groups_of_size_1": 10606,
+          "groups_of_size_2": 38637,
+          "groups_of_size_3": 49145,
+          "groups_of_size_4": 42078,
+          "groups_of_size_5": 36513,
+          "groups_of_size_6": 33603,
+          "groups_of_size_7": 19517,
+          "groups_of_size_8": 24670,
+          "groups_of_size_9": 14995,
+          "groups_of_size_10": 25829,
+          "groups_larger_than_10": 470656
+        },
+        "entropy": 18.14232248915756,
+        "total_records": 34173934,
+        "privacy_score": 99.96896465007511,
+        "l_diversity": {
+          "outpatient_diagnosis_diagnosis": {
+            "l_diversity": 0,
+            "average_distinct_values": 4.594274185023406,
+            "entropy_l_diversity": -0.0,
+            "average_entropy": 1.401000150355662
+          }
+        },
+        "t_closeness": {
+          "outpatient_diagnosis_diagnosis": {
+            "t_closeness": 0.9999999999999961,
+            "average_distance": 0.6076274789537526,
+            "groups_violating_t": 758469,
+            "total_groups": 766249
+          }
+        }
+      },
+      "dataset2_results": {
+        "k_anonymity": 1,
+        "average_group_size": 170.7187755854693,
+        "total_groups": 135575,
+        "unique_records": 126,
+        "vulnerable_groups": 3307,
+        "high_risk_percentage": 0.0005443889335753474,
+        "group_size_distribution": {
+          "groups_of_size_1": 126,
+          "groups_of_size_2": 400,
+          "groups_of_size_3": 961,
+          "groups_of_size_4": 1820,
+          "groups_of_size_5": 2590,
+          "groups_of_size_6": 3439,
+          "groups_of_size_7": 3886,
+          "groups_of_size_8": 4394,
+          "groups_of_size_9": 3922,
+          "groups_of_size_10": 4582,
+          "groups_larger_than_10": 109455
+        },
+        "entropy": 11.853594426073334,
+        "total_records": 23145217,
+        "privacy_score": 99.99945561106642,
+        "l_diversity": {
+          "outpatient_diagnosis_diagnosis": {
+            "l_diversity": 1,
+            "average_distinct_values": 16.76191775769869,
+            "entropy_l_diversity": -0.0,
+            "average_entropy": 3.7792558677304418
+          }
+        },
+        "t_closeness": {
+          "outpatient_diagnosis_diagnosis": {
+            "t_closeness": 0.9965022550249941,
+            "average_distance": 0.2521912145157458,
+            "groups_violating_t": 119165,
+            "total_groups": 135575
+          }
+        }
+      },
+      "timestamp": "2025-02-08T14:50:44.371053"
+    }
+  ]
+}
