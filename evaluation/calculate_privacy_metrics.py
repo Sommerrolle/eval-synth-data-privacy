@@ -2,10 +2,25 @@ import duckdb
 import os
 import json
 from datetime import datetime
+from scipy.stats import wasserstein_distance
 from typing import List, Dict
 import math
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import LabelEncoder  # Import LabelEncoder
+import time
+
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.bool_):
+            return bool(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NpEncoder, self).default(obj)
 
 class PrivacyMetricsCalculator:
     def __init__(self, results_dir: str = 'results', qi_inpatient=None, qi_outpatient=None, sensitive_attributes=None):
@@ -33,30 +48,33 @@ class PrivacyMetricsCalculator:
             return {"error": "Missing identifiers or sensitive attributes"}
         
         results = {}
+        
         for sensitive_attr in sensitive_attributes:
             if sensitive_attr not in df.columns:
                 continue
-                
+            
             groups = df.groupby(quasi_identifiers)
             l_values = []
             entropies = []
             
             for _, group in groups:
-                values = group[sensitive_attr].value_counts()
-                distinct_count = len(values)
+                value_counts = group[sensitive_attr].value_counts()
+                distinct_count = value_counts.nunique()
                 l_values.append(distinct_count)
                 
-                probabilities = values / len(group)
-                entropy = -sum(p * math.log2(p) for p in probabilities if p > 0)
+                probabilities = value_counts / len(group)
+                entropy = -np.sum(probabilities * np.log2(probabilities))
                 entropies.append(entropy)
             
+            # Avoid returning misleading zero values when no data is available
             results[sensitive_attr] = {
-                "l_diversity": min(l_values) if l_values else 0,
-                "average_distinct_values": float(np.mean(l_values)) if l_values else 0,
-                "entropy_l_diversity": min(entropies) if entropies else 0,
-                "average_entropy": float(np.mean(entropies)) if entropies else 0
+                "l_diversity": min(l_values) if l_values else None,
+                "average_distinct_values": float(np.mean(l_values)) if l_values else None,
+                "entropy_l_diversity": min(entropies) if entropies else None,
+                "average_entropy": float(np.mean(entropies)) if entropies else None
             }
         
+        print('Calculated l-diversity...')
         return results
 
     def calculate_t_closeness(self, df: pd.DataFrame, quasi_identifiers: List[str], 
@@ -65,54 +83,82 @@ class PrivacyMetricsCalculator:
             return {"error": "Missing identifiers or sensitive attributes"}
         
         results = {}
+        
         for sensitive_attr in sensitive_attributes:
             if sensitive_attr not in df.columns:
                 continue
-                
-            global_dist = df[sensitive_attr].value_counts(normalize=True)
+            
+            # Encode categorical sensitive attributes
+            encoder = LabelEncoder()
+            df[sensitive_attr] = encoder.fit_transform(df[sensitive_attr])
+
+            # Compute the global distribution of the sensitive attribute
+            global_dist = df[sensitive_attr].value_counts(normalize=True).sort_index()
+            
             groups = df.groupby(quasi_identifiers)
             t_values = []
             
             for _, group in groups:
-                group_dist = group[sensitive_attr].value_counts(normalize=True)
-                all_values = sorted(set(global_dist.index) | set(group_dist.index))
-                global_aligned = pd.Series([global_dist.get(v, 0) for v in all_values], index=all_values)
-                group_aligned = pd.Series([group_dist.get(v, 0) for v in all_values], index=all_values)
+                group_dist = group[sensitive_attr].value_counts(normalize=True).sort_index()
                 
-                emd = np.abs(np.cumsum(global_aligned - group_aligned)).max()
+                # Align global and group distributions
+                all_values = sorted(set(global_dist.index) | set(group_dist.index))
+                global_aligned = global_dist.reindex(all_values, fill_value=0)
+                group_aligned = group_dist.reindex(all_values, fill_value=0)
+                
+                # Compute Wasserstein Distance (EMD) using numerical values
+                emd = wasserstein_distance(
+                    all_values, all_values,  # Use the encoded numerical values
+                    u_weights=global_aligned.values, 
+                    v_weights=group_aligned.values
+                )
                 t_values.append(emd)
             
             results[sensitive_attr] = {
-                "t_closeness": max(t_values) if t_values else 0,
-                "average_distance": float(np.mean(t_values)) if t_values else 0,
+                "t_closeness": max(t_values) if t_values else None,
+                "average_distance": float(np.mean(t_values)) if t_values else None,
                 "groups_violating_t": sum(1 for t in t_values if t > t_threshold),
                 "total_groups": len(t_values)
             }
-        
+
+        print('Calculated t-closeness...')
         return results
 
     def calculate_k_anonymity(self, df: pd.DataFrame, quasi_identifiers: List[str]) -> Dict:
-        if not quasi_identifiers or not all(qi in df.columns for qi in quasi_identifiers):
-            return {"error": "Missing or invalid quasi-identifiers"}
+        if df.empty or not quasi_identifiers or not all(qi in df.columns for qi in quasi_identifiers):
+            return {"error": "Missing, empty dataset, or invalid quasi-identifiers"}
         
+        # Group by quasi-identifiers and count occurrences
         group_counts = df.groupby(quasi_identifiers).size()
-        k_value = group_counts.min()
+
+        if group_counts.empty:
+            return {"error": "No valid groups found after grouping by quasi-identifiers"}
+
+        # Compute k-anonymity metrics
+        k_value = group_counts.min()  # Smallest group size defines k
         avg_group_size = group_counts.mean()
         total_groups = len(group_counts)
-        
-        group_size_distribution = {}
-        for k in range(1, 11):
-            count = len(group_counts[group_counts == k])
-            group_size_distribution[f"groups_of_size_{k}"] = count
-        group_size_distribution["groups_larger_than_10"] = len(group_counts[group_counts > 10])
-        
-        unique_records = len(group_counts[group_counts == 1])
-        vulnerable_groups = len(group_counts[group_counts < 5])
-        high_risk_percentage = (unique_records / len(df)) * 100
-        
+        unique_records = (group_counts == 1).sum()
+        vulnerable_groups = (group_counts < 5).sum()
+        high_risk_percentage = (unique_records / len(df)) * 100 if len(df) > 0 else 0
+
+        # Optimized group size distribution (1–10 and >10)
+        group_size_counts = group_counts.value_counts()
+
+        group_size_distribution = {
+            **{i: group_size_counts.get(i, 0) for i in range(1, 11)},  # Sizes 1-10
+            "groups_larger_than_10": group_size_counts[group_size_counts.index > 10].sum()
+        }
+
+        # Compute entropy for measuring diversity of group sizes
         probabilities = group_counts / len(df)
-        entropy = -sum(p * math.log2(p) for p in probabilities if p > 0)
-        
+        entropy = -np.sum(probabilities * np.log2(probabilities)) if len(probabilities) > 0 else 0
+
+        # Privacy score: A lower variance in group sizes indicates better anonymization
+        privacy_score = (1 - (unique_records / len(df))) * 100 if len(df) > 0 else 100
+
+        print('Calculated k-anonymity...')
+
         return {
             "k_anonymity": int(k_value),
             "average_group_size": float(avg_group_size),
@@ -123,7 +169,7 @@ class PrivacyMetricsCalculator:
             "group_size_distribution": group_size_distribution,
             "entropy": float(entropy),
             "total_records": len(df),
-            "privacy_score": float((1 - (unique_records / len(df))) * 100)
+            "privacy_score": float(privacy_score)
         }
 
     def compare_tables(self, db1_path: str, db2_path: str, table_name: str) -> Dict:
@@ -194,7 +240,12 @@ class PrivacyMetricsCalculator:
         filepath = os.path.join(self.results_dir, filename)
         
         with open(filepath, 'w') as f:
-            json.dump(results, f, indent=2)
+            json.dump(
+                obj=results,       # The object to serialize
+                fp=f,              # File object to write into
+                cls=NpEncoder,     # Optional: Custom encoder for NumPy types
+                indent=2           # Optional: Pretty print with 2 spaces
+            )
         print(f"\nResults saved to: {filepath}")
 
     def run_comparison(self):
@@ -240,6 +291,14 @@ class PrivacyMetricsCalculator:
         
         self.save_results(results, db1.replace('.duckdb', ''), db2.replace('.duckdb', ''))
 
+def timed_execution(func, *args, **kwargs):
+    start_time = time.time()
+    result = func(*args, **kwargs)
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"Execution Time: {elapsed_time:.4f} seconds")
+    return result
+
 def main():
     # Define quasi-identifiers and sensitive attributes
     qi_inpatient = [
@@ -274,3 +333,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+   #timed_execution(main)
