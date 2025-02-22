@@ -1,3 +1,6 @@
+# big file for creating duckdb database of joined tables but was split
+# in two files in duckddn directory create_databases and join_tables
+
 import duckdb
 import os
 import pandas as pd

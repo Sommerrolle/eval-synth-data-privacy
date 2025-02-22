@@ -9,3 +9,5 @@ merged_output.csv
 
 *.duckdb
 *.log
+*.csv
+__pycache__
