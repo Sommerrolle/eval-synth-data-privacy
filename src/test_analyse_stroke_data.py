@@ -103,7 +103,7 @@ def save_results(results: Dict):
         results (Dict): Analysis results to save
     """
     # Create results directory if it doesn't exist
-    os.makedirs('stroke_results', exist_ok=True)
+    os.makedirs('results/stroke_results', exist_ok=True)
     
     # Generate filename with timestamp
     timestamp = datetime.now().strftime("%d%m%Y_%H%M%S")
