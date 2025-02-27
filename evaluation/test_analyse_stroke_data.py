@@ -106,9 +106,9 @@ def save_results(results: Dict):
     os.makedirs('stroke_results', exist_ok=True)
     
     # Generate filename with timestamp
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().strftime("%d%m%Y_%H%M%S")
     filename = f"privacy_metrics_stroke_{timestamp}.json"
-    filepath = os.path.join('stroke_results', filename)
+    filepath = os.path.join('results/stroke_results', filename)
     
     # Save results
     with open(filepath, 'w') as f:

@@ -43,7 +43,19 @@ class PrivacyMetricsCalculator:
         con.close()
         return [table[0] for table in tables]
 
+
     def calculate_l_diversity(self, df: pd.DataFrame, quasi_identifiers: List[str], sensitive_attributes: List[str]) -> Dict:
+        """
+        Calculate entropy l-diversity aligned with the external library implementation.
+        
+        Args:
+            df: DataFrame containing the data
+            quasi_identifiers: List of quasi-identifier column names
+            sensitive_attributes: List of sensitive attribute column names
+            
+        Returns:
+            Dictionary containing l-diversity metrics including entropy l-diversity
+        """
         if not quasi_identifiers or not sensitive_attributes:
             return {"error": "Missing identifiers or sensitive attributes"}
         
@@ -55,26 +67,53 @@ class PrivacyMetricsCalculator:
             
             groups = df.groupby(quasi_identifiers)
             l_values = []
-            entropies = []
+            entropy_values = []
+            entropy_l_values = []
+            problematic_groups = 0
+            total_groups = 0
             
             for _, group in groups:
-                value_counts = group[sensitive_attr].value_counts()
-                distinct_count = value_counts.nunique()
+                total_groups += 1
+                
+                # Get values of sensitive attribute in this group
+                values = group[sensitive_attr].values
+                
+                # Count distinct values for traditional l-diversity
+                distinct_count = len(np.unique(values))
                 l_values.append(distinct_count)
                 
-                probabilities = value_counts / len(group)
-                entropy = -np.sum(probabilities * np.log2(probabilities))
-                entropies.append(entropy)
+                if distinct_count == 1:
+                    problematic_groups += 1
+                    entropy_values.append(0)  # No diversity means zero entropy
+                    entropy_l_values.append(1)  # e^0 = 1
+                else:
+                    # Calculate entropy using natural logarithm (as in the library)
+                    unique_values = np.unique(values)
+                    p = [len(group[group[sensitive_attr] == s]) / len(group) for s in unique_values]
+                    entropy = -np.sum(p * np.log(p))  # Natural log
+                    entropy_values.append(entropy)
+                    
+                    # Calculate entropy l-diversity value: e^entropy
+                    entropy_l = np.exp(entropy)
+                    entropy_l_values.append(entropy_l)
             
-            # Avoid returning misleading zero values when no data is available
+            # Calculate metrics
+            min_l = min(l_values) if l_values else 0
+            min_entropy = min(entropy_values) if entropy_values else 0
+            min_entropy_l = min(entropy_l_values) if entropy_l_values else 1
+            
             results[sensitive_attr] = {
-                "l_diversity": min(l_values) if l_values else None,
-                "average_distinct_values": float(np.mean(l_values)) if l_values else None,
-                "entropy_l_diversity": min(entropies) if entropies else None,
-                "average_entropy": float(np.mean(entropies)) if entropies else None
+                "l_diversity": min_l,
+                "entropy_raw": float(min_entropy),
+                "entropy_l_diversity": int(min_entropy_l),  # Convert to integer as in the library pyCANON
+                "average_entropy": float(np.mean(entropy_values)) if entropy_values else None,
+                "average_distinct_values": float(np.mean(l_values)) if l_values else 0,
+                "problematic_groups_count": problematic_groups,
+                "total_groups": total_groups,
+                "problematic_groups_percentage": (problematic_groups / total_groups * 100) if total_groups > 0 else 0,
             }
         
-        print('Calculated l-diversity...')
+        print('Calculated entropy l-diversity aligned with library implementation...')
         return results
 
     def calculate_t_closeness(self, df: pd.DataFrame, quasi_identifiers: List[str], 
@@ -235,7 +274,7 @@ class PrivacyMetricsCalculator:
             print("Invalid selection. Please try again.")
 
     def save_results(self, results: Dict, db1_name: str, db2_name: str):
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now().strftime("%d%m%Y_%H%M%S")
         filename = f"privacy_metrics_{db1_name}_{db2_name}_{timestamp}.json"
         filepath = os.path.join(self.results_dir, filename)
         
