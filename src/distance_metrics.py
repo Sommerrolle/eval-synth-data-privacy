@@ -32,6 +32,147 @@ class PrivacyMetricsCalculator:
         os.makedirs(results_dir, exist_ok=True)
         self.db_manager = DuckDBManager()
         
+    def detect_mixed_type_columns(self, df):
+        """
+        Detect columns with mixed data types and categorize columns as numeric, timestamp, or string.
+        
+        Args:
+            df: DataFrame to analyze
+            
+        Returns:
+            Tuple of (mixed_columns, numeric_cols, timestamp_cols, string_cols)
+        """
+        mixed_columns = []
+        numeric_cols = []
+        timestamp_cols = []
+        string_cols = []
+        
+        for col in df.columns:
+            # Skip columns with all NaN values
+            if df[col].isna().all():
+                continue
+                
+            # Get non-null values and their types
+            non_null_values = df[col].dropna()
+            if len(non_null_values) == 0:
+                continue
+                
+            # Check types
+            types = set(type(x).__name__ for x in non_null_values)
+            
+            if len(types) > 1:
+                mixed_columns.append(col)
+                logging.warning(f"Column '{col}' has mixed types: {types}")
+                
+                # Check if it's primarily numeric
+                try:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                    if not df[col].isna().all():
+                        numeric_cols.append(col)
+                    else:
+                        # Try to convert to datetime
+                        try:
+                            df[col] = pd.to_datetime(df[col], errors='coerce')
+                            if not df[col].isna().all():
+                                timestamp_cols.append(col)
+                            else:
+                                # Default to string
+                                df[col] = df[col].astype(str)
+                                string_cols.append(col)
+                        except:
+                            df[col] = df[col].astype(str)
+                            string_cols.append(col)
+                except:
+                    # Not numeric, try datetime
+                    try:
+                        df[col] = pd.to_datetime(df[col], errors='coerce')
+                        if not df[col].isna().all():
+                            timestamp_cols.append(col)
+                        else:
+                            df[col] = df[col].astype(str)
+                            string_cols.append(col)
+                    except:
+                        df[col] = df[col].astype(str)
+                        string_cols.append(col)
+            else:
+                # Single type columns
+                type_name = list(types)[0]
+                if type_name in ('int', 'float', 'int64', 'float64', 'int32', 'float32'):
+                    numeric_cols.append(col)
+                elif type_name in ('Timestamp', 'datetime64[ns]', 'datetime'):
+                    timestamp_cols.append(col)
+                else:
+                    # Treat as string
+                    df[col] = df[col].astype(str)
+                    string_cols.append(col)
+        
+        return mixed_columns, numeric_cols, timestamp_cols, string_cols
+    
+    def standardize_column_types(self, df1, df2):
+        """
+        Ensure both dataframes have the same column types.
+        
+        Args:
+            df1: First DataFrame
+            df2: Second DataFrame
+            
+        Returns:
+            Tuple of (df1, df2, numeric_cols, string_cols) with standardized types
+        """
+        # Get common columns
+        common_cols = list(set(df1.columns).intersection(set(df2.columns)))
+        df1 = df1[common_cols].copy()
+        df2 = df2[common_cols].copy()
+        
+        logging.info(f"Standardizing types for {len(common_cols)} common columns")
+        
+        # Detect mixed columns in each DataFrame
+        mixed1, numeric1, timestamp1, string1 = self.detect_mixed_type_columns(df1)
+        mixed2, numeric2, timestamp2, string2 = self.detect_mixed_type_columns(df2)
+        
+        # Get all mixed columns from both DataFrames
+        all_mixed = set(mixed1 + mixed2)
+        logging.info(f"Found {len(all_mixed)} columns with mixed types")
+        if all_mixed:
+            logging.info(f"Mixed type columns: {all_mixed}")
+        
+        # Standardize numeric columns (intersection of numeric columns in both DataFrames)
+        numeric_cols = list(set(numeric1).intersection(set(numeric2)))
+        for col in numeric_cols:
+            df1[col] = pd.to_numeric(df1[col], errors='coerce')
+            df2[col] = pd.to_numeric(df2[col], errors='coerce')
+        
+        # For timestamp columns, convert to string to avoid encoding issues
+        timestamp_cols = list(set(timestamp1).union(set(timestamp2)))
+        for col in timestamp_cols:
+            if col in df1.columns:
+                try:
+                    df1[col] = pd.to_datetime(df1[col], errors='coerce')
+                    df1[col] = df1[col].dt.strftime('%Y-%m-%d %H:%M:%S')
+                except:
+                    df1[col] = df1[col].astype(str)
+            
+            if col in df2.columns:
+                try:
+                    df2[col] = pd.to_datetime(df2[col], errors='coerce')
+                    df2[col] = df2[col].dt.strftime('%Y-%m-%d %H:%M:%S')
+                except:
+                    df2[col] = df2[col].astype(str)
+            
+            # Add these standardized timestamp columns to string columns
+            if col not in string1:
+                string1.append(col)
+            if col not in string2:
+                string2.append(col)
+        
+        # All non-numeric columns are treated as strings
+        string_cols = list(set(df1.columns).difference(set(numeric_cols)))
+        for col in string_cols:
+            df1[col] = df1[col].astype(str)
+            df2[col] = df2[col].astype(str)
+        
+        return df1, df2, numeric_cols, string_cols
+        
     def calculate_metrics(self, db1_path, db2_path, table_name, sample_size=10000):
         """
         Calculate privacy metrics (DCR and NNDR) between original and synthetic datasets.
@@ -53,11 +194,11 @@ class PrivacyMetricsCalculator:
             original_data = self.db_manager.load_table_data(db1_path, table_name)
             synthetic_data = self.db_manager.load_table_data(db2_path, table_name)
             
-            logging.info(f"Original data shape: {original_data.shape}")
-            logging.info(f"Synthetic data shape: {synthetic_data.shape}")
-            
             if original_data.empty or synthetic_data.empty:
                 raise ValueError("One or both datasets are empty")
+                
+            logging.info(f"Original data shape: {original_data.shape}")
+            logging.info(f"Synthetic data shape: {synthetic_data.shape}")
         except Exception as e:
             logging.error(f"Error retrieving data: {str(e)}")
             return {"error": str(e)}
@@ -79,14 +220,15 @@ class PrivacyMetricsCalculator:
         original_sample = original_data.sample(n=no_of_records, random_state=42).reset_index(drop=True)
         synthetic_sample = synthetic_data.sample(n=no_of_records, random_state=42).reset_index(drop=True)
         
-        # Identify column types
-        string_cols = original_sample.select_dtypes(exclude=np.number).columns
-        numeric_cols = original_sample.select_dtypes(include=np.number).columns
+        # Standardize column types
+        original_sample, synthetic_sample, numeric_cols, string_cols = self.standardize_column_types(
+            original_sample, synthetic_sample
+        )
         
-        logging.info(f"Numeric columns: {len(numeric_cols)}")
-        logging.info(f"String columns: {len(string_cols)}")
+        logging.info(f"After standardization - Numeric columns: {len(numeric_cols)}")
+        logging.info(f"After standardization - String columns: {len(string_cols)}")
         
-        # Handle case where no string columns are present
+        # Create transformer for feature encoding
         transformers = []
         if len(numeric_cols) > 0:
             transformers.append((SimpleImputer(missing_values=np.nan, strategy="mean"), numeric_cols))
@@ -97,10 +239,9 @@ class PrivacyMetricsCalculator:
             logging.error("No valid columns for transformation")
             return {"error": "No valid columns for transformation"}
             
-        # Create transformer for feature encoding
         transformer = make_column_transformer(
             *transformers,
-            remainder="passthrough",
+            remainder="drop",
         )
         
         # Fit and transform the data
@@ -240,7 +381,8 @@ class PrivacyMetricsCalculator:
         
         logging.info(f"Results saved to: {filepath}")
         return filepath
-    
+
+    # [keep other methods unchanged]
 
 def main():
     parser = argparse.ArgumentParser(description='Calculate privacy metrics between original and synthetic datasets')
