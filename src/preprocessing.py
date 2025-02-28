@@ -140,37 +140,35 @@ class MedicalDataPreprocessor:
             
             # Execute query using db_manager
             self.db_manager.execute_query(db_path, f"DROP TABLE IF EXISTS {output_table_name}")
-            result = self.db_manager.execute_query(db_path, create_table_sql)
+            self.db_manager.execute_query(db_path, create_table_sql)
             
-            if result is None:
-                logging.error(f"Failed to create preprocessed table '{output_table_name}'")
-                return None
-            
-            # Get table statistics
-            original_count = self.db_manager.get_table_count(db_path, table_name)
-            processed_count = self.db_manager.get_table_count(db_path, output_table_name)
-            
-            logging.info(f"Original row count: {original_count}")
-            logging.info(f"Processed row count: {processed_count}")
-            logging.info(f"Removed {original_count - processed_count} rows with > {max_nulls} NULL values")
-            
-            # Check for remaining nulls in each column
-            for col in filtered_columns:
-                null_count = self.db_manager.execute_query(
-                    db_path, 
-                    f"SELECT COUNT(*) FROM {output_table_name} WHERE {col} IS NULL"
-                )
-                if null_count and null_count[0][0] > 0:
-                    logging.info(f"Column '{col}': {null_count[0][0]} NULL values remain")
-            
+            self._log_table_statistics(db_path, table_name, output_table_name, max_nulls, filtered_columns)
             return output_table_name
             
         except Exception as e:
             logging.error(f"Error preprocessing table: {str(e)}")
             return None
+        
+    def _log_table_statistics(self, db_path: str, table_name: str, output_table_name: str, max_nulls: int, filtered_columns: list):
+        # Get table statistics
+        original_count = self.db_manager.get_table_count(db_path, table_name)
+        processed_count = self.db_manager.get_table_count(db_path, output_table_name)
+        
+        logging.info(f"Original row count: {original_count}")
+        logging.info(f"Processed row count: {processed_count}")
+        logging.info(f"Removed {original_count - processed_count} rows with > {max_nulls} NULL values")
+        
+        # Check for remaining nulls in each column
+        for col in filtered_columns:
+            null_count = self.db_manager.execute_query(
+                db_path, 
+                f"SELECT COUNT(*) FROM {output_table_name} WHERE {col} IS NULL"
+            )
+            if null_count and null_count[0][0] > 0:
+                logging.info(f"Column '{col}': {null_count[0][0]} NULL values remain")
+
 
 def main():
-    """Main function to run the preprocessing."""
     """Main function to run the preprocessing."""
     
     # Hardcoded default parameters
