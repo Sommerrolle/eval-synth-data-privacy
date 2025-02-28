@@ -137,7 +137,7 @@ class DuckDBManager:
             Query results as a list of tuples, or None if an error occurs
         """
         try:
-            conn = duckdb.connect(db_path, read_only=True)
+            conn = duckdb.connect(db_path)
             results = conn.execute(query).fetchall()
             return results
         except Exception as e:
