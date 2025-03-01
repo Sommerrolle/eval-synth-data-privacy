@@ -12,7 +12,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('data_preprocessing.log'),
+        logging.FileHandler('logs/data_preprocessing.log'),
         logging.StreamHandler()
     ]
 )
@@ -208,7 +208,8 @@ def main():
     
     # Hardcoded default parameters
     DEFAULT_PARAMS = {
-        'db_path': 'data/duckdb/claims_data_minimal.duckdb',
+        #'db_path': 'data/duckdb/claims_data_minimal.duckdb',
+        'db_path': 'data/duckdb/limebit_mtgan_minimal.duckdb',
         'table_name': 'joined_1_4_5_6_7',
         'output_table': None,  # Will use {table_name}_preprocessed by default
         'max_nulls': 3

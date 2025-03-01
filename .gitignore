@@ -11,3 +11,4 @@ merged_output.csv
 *.log
 *.csv
 __pycache__
+logs

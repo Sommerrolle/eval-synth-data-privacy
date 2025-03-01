@@ -18,7 +18,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('privacy_metrics.log'),
+        logging.FileHandler('logs/distance_metrics.log'),
         logging.StreamHandler()
     ]
 )
@@ -108,6 +108,117 @@ class PrivacyMetricsCalculator:
         
         return mixed_columns, numeric_cols, timestamp_cols, string_cols
     
+
+    ## Function to check with comments if time conversion is correct
+    # def convert_timestamps_to_epoch(self, df, timestamp_cols, numeric_cols):
+    #     """
+    #     Convert timestamp columns to Unix epoch time (seconds since 1970-01-01).
+        
+    #     Args:
+    #         df: DataFrame to process
+    #         timestamp_cols: List of column names containing timestamp data
+    #         numeric_cols: List of numeric column names for the dataframe
+            
+    #     Returns:
+    #         Tuple containing (df, updated_numeric_cols) with updated values
+    #     """
+    #     for col in timestamp_cols:
+    #         if col in df.columns:
+    #             # Print before conversion examples
+    #             sample_before = df[col].dropna().head(3).tolist()
+    #             print(f"\nBEFORE CONVERSION - Column '{col}' examples:")
+    #             print(f"  Data type: {df[col].dtype}")
+    #             print(f"  Sample values: {sample_before}")
+                
+    #             try:
+    #                 df[col] = pd.to_datetime(df[col], errors='coerce')
+                    
+    #                 # Print after datetime conversion
+    #                 sample_datetime = df[col].dropna().head(3).tolist()
+    #                 print(f"\nAFTER DATETIME CONVERSION - Column '{col}' examples:")
+    #                 print(f"  Data type: {df[col].dtype}")
+    #                 print(f"  Sample values: {sample_datetime}")
+                    
+    #                 # Log problematic values
+    #                 if df[col].isna().any():
+    #                     problematic_values = df.loc[df[col].isna(), col].head(5).tolist()
+    #                     logging.warning(f"Column '{col}' has {df[col].isna().sum()} values that couldn't be converted to datetime. Examples: {problematic_values}")
+    #                     print(f"  Warning: {df[col].isna().sum()} values couldn't be converted to datetime")
+    #                     if problematic_values:
+    #                         print(f"  Problem examples: {problematic_values}")
+                    
+    #                 # Convert to Unix timestamp (seconds since epoch)
+    #                 df[col] = df[col].apply(lambda x: x.timestamp() if pd.notna(x) else np.nan)
+                    
+    #                 # Print after timestamp conversion
+    #                 sample_after = df[col].dropna().head(3).tolist()
+    #                 print(f"\nAFTER EPOCH CONVERSION - Column '{col}' examples:")
+    #                 print(f"  Data type: {df[col].dtype}")
+    #                 print(f"  Sample values: {sample_after}")
+    #                 print(f"  Range: Min={df[col].min()}, Max={df[col].max()}")
+                    
+    #                 # Verify the conversion worked as expected
+    #                 if len(sample_datetime) > 0 and len(sample_after) > 0:
+    #                     print("\nVERIFICATION:")
+    #                     # Convert the first datetime back from timestamp and compare
+    #                     first_dt = sample_datetime[0]
+    #                     first_ts = sample_after[0]
+    #                     back_to_dt = pd.to_datetime(first_ts, unit='s')
+    #                     print(f"  Original datetime: {first_dt}")
+    #                     print(f"  As timestamp: {first_ts}")
+    #                     print(f"  Back to datetime: {back_to_dt}")
+    #                     print(f"  Conversion accurate: {first_dt.strftime('%Y-%m-%d %H:%M:%S') == back_to_dt.strftime('%Y-%m-%d %H:%M:%S')}")
+                    
+    #             except Exception as e:
+    #                 print(f"\nERROR: Failed to convert column '{col}' to timestamp: {str(e)}")
+    #                 logging.error(f"Failed to convert column '{col}' to timestamp: {str(e)}")
+    #                 # Force numeric conversion, set unconvertible values to NaN
+    #                 df[col] = pd.to_numeric(df[col], errors='coerce')
+    #                 print(f"  Fallback to numeric conversion. New dtype: {df[col].dtype}")
+                
+    #             # Add to numeric columns
+    #             if col not in numeric_cols:
+    #                 numeric_cols.append(col)
+    #                 print(f"  Added '{col}' to numeric columns list")
+    
+    #     return df, numeric_cols
+    
+    def convert_timestamps_to_epoch(df, timestamp_cols, numeric_cols):
+        """
+        Convert timestamp columns to Unix epoch time (seconds since 1970-01-01).
+        
+        Args:
+            df: DataFrame to process
+            timestamp_cols: List of column names containing timestamp data
+            numeric_cols: List of numeric column names for the dataframe
+            
+        Returns:
+            Tuple containing (df, updated_numeric_cols) with updated values
+        """
+        for col in timestamp_cols:
+            if col in df.columns:
+                try:
+                    df[col] = pd.to_datetime(df[col], errors='coerce')
+                    # Log problematic values
+                    if df[col].isna().any():
+                        problematic_values = df.loc[df[col].isna(), col].head(5).tolist()
+                        logging.warning(f"Column '{col}' has {df[col].isna().sum()} values that couldn't be converted to datetime. Examples: {problematic_values}")
+                        if problematic_values:
+                            logging.warning(f"  Problem examples: {problematic_values}")
+                    # Convert to Unix timestamp (seconds since epoch)
+                    df[col] = df[col].apply(lambda x: x.timestamp() if pd.notna(x) else np.nan)
+                except Exception as e:
+                    logging.error(f"Failed to convert column '{col}' to timestamp: {str(e)}")
+                    # Force numeric conversion, set unconvertible values to NaN
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                
+                # Add to numeric columns
+                if col not in numeric_cols:
+                    numeric_cols.append(col)
+        
+        return df, numeric_cols
+    
+
     def standardize_column_types(self, df1, df2):
         """
         Ensure both dataframes have the same column types.
@@ -135,35 +246,20 @@ class PrivacyMetricsCalculator:
         logging.info(f"Found {len(all_mixed)} columns with mixed types")
         if all_mixed:
             logging.info(f"Mixed type columns: {all_mixed}")
+
+        # Process timestamp columns - convert to epoch time (numeric)
+        timestamp_cols = list(set(timestamp1).union(set(timestamp2)))
+
+        # Process each dataframe separately
+        df1, numeric1 = self.convert_timestamps_to_epoch(df1, timestamp_cols, numeric1)
+        df2, numeric2 = self.convert_timestamps_to_epoch(df2, timestamp_cols, numeric2)
         
         # Standardize numeric columns (intersection of numeric columns in both DataFrames)
         numeric_cols = list(set(numeric1).intersection(set(numeric2)))
         for col in numeric_cols:
             df1[col] = pd.to_numeric(df1[col], errors='coerce')
             df2[col] = pd.to_numeric(df2[col], errors='coerce')
-        
-        # For timestamp columns, convert to string to avoid encoding issues
-        timestamp_cols = list(set(timestamp1).union(set(timestamp2)))
-        for col in timestamp_cols:
-            if col in df1.columns:
-                try:
-                    df1[col] = pd.to_datetime(df1[col], errors='coerce')
-                    df1[col] = df1[col].dt.strftime('%Y-%m-%d %H:%M:%S')
-                except:
-                    df1[col] = df1[col].astype(str)
-            
-            if col in df2.columns:
-                try:
-                    df2[col] = pd.to_datetime(df2[col], errors='coerce')
-                    df2[col] = df2[col].dt.strftime('%Y-%m-%d %H:%M:%S')
-                except:
-                    df2[col] = df2[col].astype(str)
-            
-            # Add these standardized timestamp columns to string columns
-            if col not in string1:
-                string1.append(col)
-            if col not in string2:
-                string2.append(col)
+
         
         # All non-numeric columns are treated as strings
         string_cols = list(set(df1.columns).difference(set(numeric_cols)))
