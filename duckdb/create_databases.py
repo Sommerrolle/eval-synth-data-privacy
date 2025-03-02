@@ -114,6 +114,104 @@ PARSE_DATES = {
     'drugs': ['date of prescription', 'date of dispense']
 }
 
+# Dictionary for column type conversions
+# Format: {'table_name': {'column_name': 'new_type', ...}, ...}
+COLUMN_TYPE_MAPPINGS = {
+    'insurants': {
+        'pid': 'INTEGER',
+        'insurants_gender': 'INTEGER',
+        'insurants_year_of_birth': 'BIGINT'
+    },
+    'insurance_data': {
+        'pid': 'INTEGER',
+        'insurance_data_from': 'DATE',
+        'insurance_data_to': 'DATE',
+        'insurance_data_death': 'INTEGER',
+        'insurance_data_regional_code': 'INTEGER'
+    },
+    'drugs': {
+        'pid': 'INTEGER',
+        'drugs_date_of_prescription': 'DATE',
+        'drugs_date_of_dispense': 'DATE',
+        'drugs_pharma_central_number': 'VARCHAR(9)',
+        'drugs_specialty_of_prescriber': 'VARCHAR(2)',
+        'drugs_physican_code': 'VARCHAR(9)',
+        'drugs_practice_code': 'VARCHAR(9)',
+        'drugs_quantity': 'DOUBLE',
+        'drugs_amount_due': 'DOUBLE',
+        'drugs_atc': 'VARCHAR',
+        'drugs_ddd': 'DOUBLE'
+    },
+    'outpatient_cases': {
+        'outpatient_caseID': 'INTEGER',
+        'pid': 'INTEGER',
+        'outpatient_cases_practice_code': 'VARCHAR(9)',
+        'outpatient_cases_from': 'DATE',
+        'outpatient_cases_to': 'DATE',
+        'outpatient_cases_amount_due': 'DOUBLE',
+        'outpatient_cases_year': 'INTEGER',
+        'outpatient_cases_quarter': 'INTEGER'
+    },
+    'outpatient_diagnosis': {  # Renamed from outpatients_diagnosis
+        'pid': 'INTEGER',
+        'outpatient_caseID': 'INTEGER',
+        'outpatient_diagnosis_diagnosis': 'VARCHAR',
+        'outpatient_diagnosis_qualification': 'VARCHAR(1)',
+        'outpatient_diagnosis_localisation': 'INTEGER'
+    },
+    'outpatient_fees': {  # Renamed from outpatients_fees
+        'pid': 'INTEGER',
+        'outpatient_caseID': 'INTEGER',
+        'outpatient_fees_physican_code': 'VARCHAR',
+        'outpatient_fees_specialty_code': 'VARCHAR',
+        'outpatient_fees_billing_code': 'VARCHAR',
+        'outpatient_fees_quantity': 'DOUBLE',
+        'outpatient_fees_date': 'DATE'
+    },
+    'outpatient_procedures': {  # Renamed from outpatients_procedures
+        'pid': 'INTEGER',
+        'outpatient_caseID': 'INTEGER',
+        'outpatient_procedures_procedure_code': 'VARCHAR',
+        'outpatient_procedures_localisation': 'INTEGER',
+        'outpatient_procedures_date_of_procedure': 'DATE'
+    },
+    'inpatient_cases': {
+        'inpatient_caseID': 'INTEGER',
+        'pid': 'INTEGER',
+        'inpatient_cases_date_of_admission': 'DATE',
+        'inpatient_cases_date_of_discharge': 'DATE',
+        'inpatient_cases_cause_of_admission': 'VARCHAR(4)',
+        'inpatient_cases_cause_of_discharge': 'VARCHAR(2)',
+        'inpatient_cases_outpatient_treatment': 'INTEGER',
+        'inpatient_cases_department_admission': 'VARCHAR(4)',
+        'inpatient_cases_department_discharge': 'VARCHAR(4)'  # Fixed spelling
+    },
+    'inpatient_diagnosis': {  # Renamed from inpatients_diagnosis
+        'pid': 'INTEGER',
+        'inpatient_caseID': 'INTEGER',
+        'inpatient_diagnosis_diagnosis': 'VARCHAR',
+        'inpatient_diagnosis_type_of_diagnosis': 'VARCHAR(2)',
+        'inpatient_diagnosis_is_main_diagnosis': 'INTEGER',
+        'inpatient_diagnosis_localisation': 'INTEGER'
+    },
+    'inpatient_fees': {  # Renamed from inpatients_fees
+        'pid': 'INTEGER',
+        'inpatient_caseID': 'INTEGER',
+        'inpatient_fees_from': 'DATE',
+        'inpatient_fees_to': 'DATE',
+        'inpatient_fees_billing_code': 'VARCHAR',
+        'inpatient_fees_amount_due': 'DOUBLE',
+        'inpatient_fees_quantity': 'DOUBLE'
+    },
+    'inpatient_procedures': {  # Renamed from inpatients_procedures
+        'pid': 'INTEGER',
+        'inpatient_caseID': 'INTEGER',
+        'inpatient_procedures_procedure_code': 'VARCHAR',
+        'inpatient_procedures_localisation': 'INTEGER',
+        'inpatient_procedures_date_of_procedure': 'DATE'
+    }
+}
+
 def rename_columns(df: pd.DataFrame, prefix: str, exceptions: List[str] = None, 
                   dataset_type: str = None) -> pd.DataFrame:
     """Rename DataFrame columns with consistent formatting."""
@@ -133,52 +231,53 @@ def rename_columns(df: pd.DataFrame, prefix: str, exceptions: List[str] = None,
     return df.rename(columns=rename_column)
 
 def read_csv_file(filepath: str, col_types: Dict, table_name: str) -> pd.DataFrame:
-    """Read a CSV file with consistent handling of missing values across datasets."""
+    """Read a CSV file with consistent handling of missing values and correct data types."""
     try:
-        # First read without dtype specification to check the data
+        # Prepare the dtype dictionary for pandas read_csv
+        dtype_dict = {}
+        if col_types:
+            for col, col_type in col_types.items():
+                # Skip date columns as they will be handled by parse_dates
+                if col in PARSE_DATES.get(table_name, []):
+                    continue
+                # Add to dtype dictionary
+                dtype_dict[col] = col_type
+        
+        logging.info(f"Reading {filepath}...")
+        
+        # Read CSV with dtype specification
         df = pd.read_csv(
             filepath,
             sep='\t',
             encoding='utf-8',
             on_bad_lines='warn',
             parse_dates=PARSE_DATES.get(table_name, None),
-            encoding_errors='replace'
+            encoding_errors='replace',
+            dtype=dtype_dict
         )
         
-        # Handle numeric columns consistently across all tables
-        numeric_columns = {
-            'amount due': 0.0,  # Replace NaN with 0.0 for all amount columns
-            'quantity': 0,      # Replace NaN with 0 for all quantity columns
-            'ddd': 0.0,        # Replace NaN with 0.0 for Defined Daily Dose
-        }
-        
+        #Handle specific column types that might need additional processing
         for col in df.columns:
             col_lower = col.lower()
-            
             # Handle amount columns
             if 'amount' in col_lower:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
-            
             # Handle quantity columns
             elif 'quantity' in col_lower:
-                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype('Int64')
-            
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
             # Handle DDD (Defined Daily Dose)
             elif col_lower == 'ddd':
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
-            
+            elif col_lower == 'localisation':
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             # Handle categorical columns (keep NaN)
             elif col in ['diagnosis', 'procedure_code', 'atc', 'billing_code', 
-                        'physican_code', 'practice_code', 'specialty_code']:
-                # Convert to string but keep NaN as NaN
-                df[col] = df[col].astype(str).replace('nan', pd.NA)
-            
-            # Apply original dtype if specified
-            elif col_types and col in col_types:
-                try:
-                    df[col] = pd.to_numeric(df[col], errors='coerce').astype(col_types[col])
-                except Exception as type_error:
-                    logging.warning(f"Could not convert column {col} to {col_types[col]} in {filepath}. Error: {str(type_error)}")
+                        'physican_code', 'practice_code', 'specialty_code', 'atc',
+                        'pharma_central_number', 'speciality_of_prescriber',
+                        'qualificatoin', '']:
+                # Only convert to string if not already an object type
+                if df[col].dtype != 'object':
+                    df[col] = df[col].astype(str).replace('nan', pd.NA)
         
         # Log the number of NaN values in each column
         nan_counts = df.isna().sum()
@@ -212,6 +311,118 @@ def sort_tables_by_pid(database_path: str) -> None:
         logging.error(f"Error sorting tables: {str(e)}")
     finally:
         con.close()
+
+def change_column_types(database_path: str, type_mappings: Dict[str, Dict[str, str]]) -> bool:
+    """
+    Change the data types of specified columns in a DuckDB database.
+    
+    Args:
+        database_path: Path to the DuckDB database file
+        type_mappings: Dictionary mapping table names to column/type mappings
+                       Format: {'table_name': {'column_name': 'new_type', ...}, ...}
+    
+    Returns:
+        bool: True if all changes were successful, False otherwise
+    """
+    if not os.path.exists(database_path):
+        logging.error(f"Database file not found: {database_path}")
+        return False
+        
+    con = duckdb.connect(database=database_path, read_only=False)
+    success = True
+    
+    try:
+        # Get list of tables in the database
+        tables = [row[0] for row in con.execute("SHOW TABLES").fetchall()]
+        
+        for table_name, column_mappings in type_mappings.items():
+            if table_name not in tables:
+                logging.warning(f"Table '{table_name}' not found in database")
+                success = False
+                continue
+                
+            # Get current columns and their types
+            current_columns = {row[0]: row[1] for row in con.execute(f"DESCRIBE {table_name}").fetchall()}
+            
+            for column_name, new_type in column_mappings.items():
+                if column_name not in current_columns:
+                    logging.warning(f"Column '{column_name}' not found in table '{table_name}'")
+                    success = False
+                    continue
+                
+                current_type = current_columns[column_name]
+                
+                if current_type == new_type:
+                    logging.info(f"Column '{column_name}' in table '{table_name}' already has type '{new_type}'")
+                    continue
+                
+                logging.info(f"Changing type of column '{column_name}' in table '{table_name}' from '{current_type}' to '{new_type}'")
+                
+                try:
+                    con.execute(f"ALTER TABLE {table_name} ALTER {column_name} TYPE {new_type}")
+                    logging.info(f"Successfully changed type of '{column_name}' in '{table_name}' to '{new_type}'")
+                
+                except Exception as e:
+                    logging.error(f"Error changing column type: {str(e)}")
+                    success = False
+    
+    except Exception as e:
+        logging.error(f"Error changing column types: {str(e)}")
+        success = False
+    
+    finally:
+        con.close()
+        
+    return success
+
+
+def fix_column_types_in_database(db_path: str) -> bool:
+    """Apply standard column type conversions to the database."""
+    logging.info(f"Fixing column data types in database: {db_path}")
+    result = change_column_types(db_path, COLUMN_TYPE_MAPPINGS)
+    if result:
+        logging.info("Successfully updated all column data types")
+    else:
+        logging.warning("Some column type conversions failed. Check the log for details.")
+    return result
+
+
+def fix_existing_database_types():
+    """Interactive function to fix column types in an existing database."""
+    # Get a list of existing DuckDB databases
+    existing_dbs = get_existing_databases()
+    if not existing_dbs:
+        print("No existing databases found in the DuckDB directory.")
+        return
+    
+    print("\nAvailable databases:")
+    for i, db in enumerate(existing_dbs, 1):
+        print(f"{i}. {db}")
+    
+    while True:
+        try:
+            print("\nSelect a database to fix column types (enter number):")
+            selection = int(input("> ").strip())
+            if 1 <= selection <= len(existing_dbs):
+                selected_db = list(existing_dbs)[selection - 1]
+                break
+            print(f"Please enter a number between 1 and {len(existing_dbs)}")
+        except ValueError:
+            print("Please enter a valid number")
+    
+    db_path = os.path.join(DUCKDB_DIR, f"{selected_db}.duckdb")
+    if not os.path.exists(db_path):
+        print(f"Database file not found: {db_path}")
+        return
+    
+    print(f"\nFixing column types in database: {db_path}")
+    result = fix_column_types_in_database(db_path)
+    
+    if result:
+        print(f"\n✅ Successfully updated column types in {selected_db}")
+    else:
+        print(f"\n⚠️ Some column type conversions failed in {selected_db}. Check the log for details.")
+
 
 def create_database(data_dir: str, force_recreate: bool = False) -> str:
     """Create a DuckDB database from CSV files in the specified directory."""
@@ -259,6 +470,13 @@ def create_database(data_dir: str, force_recreate: bool = False) -> str:
         # Sort tables by pid
         con.close()
         sort_tables_by_pid(str(db_path))
+
+        # Fix column types if requested
+        logging.info(f"Fixing column types in database: {db_path}")
+        if change_column_types(str(db_path), COLUMN_TYPE_MAPPINGS):
+            logging.info("Successfully updated column data types")
+        else:
+            logging.warning("Some column type conversions failed. Check the log for details.")
         
         return str(db_path)
     
@@ -375,7 +593,7 @@ def main():
     base_dir = 'D:/Benutzer/Cuong.VoTa/datasets'
     
     # Get existing databases
-    existing_dbs = get_existing_databases()
+    existing_dbs = get_existing_databases(duckdb_dir = "data/duckdb")
     
     # Display options and get user selection
     options = display_directory_options(base_dir, existing_dbs)
