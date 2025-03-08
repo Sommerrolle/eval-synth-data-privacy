@@ -255,29 +255,36 @@ def read_csv_file(filepath: str, col_types: Dict, table_name: str) -> pd.DataFra
             encoding_errors='replace',
             dtype=dtype_dict
         )
+
+        categorical_columns = ['diagnosis', 'procedure code', 'atc', 'billing code', 
+                        'physican code', 'practice code', 'specialty code', 'atc',
+                        'pharma central number', 'specialty of prescriber',
+                        'qualification', 'cause of admission', 'cause of discharge',
+                        'department admission', 'deparmtment discharge',
+                        'type of diagnosis', 'regional code']
+
+        numercial_float_columns = ['amount', 'quantity', 'ddd']
+        numerical_int_columns = ['localisation', 'Year_of_birth', ]
         
         #Handle specific column types that might need additional processing
         for col in df.columns:
             col_lower = col.lower()
             # Handle amount columns
-            if 'amount' in col_lower:
+            # if 'amount' in col_lower:
+            #     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
+            # # Handle quantity columns
+            # elif 'quantity' in col_lower:
+            #     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
+            # # Handle DDD (Defined Daily Dose)
+            # elif col_lower == 'ddd':
+            #     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
+            if any(keyword in col_lower for keyword in numercial_float_columns):
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
-            # Handle quantity columns
-            elif 'quantity' in col_lower:
-                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
-            # Handle DDD (Defined Daily Dose)
-            elif col_lower == 'ddd':
-                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
-            elif col_lower == 'localisation':
-                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+            # elif col_lower == 'localisation':
+            #     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             # Handle categorical columns (keep NaN)
-            elif col in ['diagnosis', 'procedure_code', 'atc', 'billing_code', 
-                        'physican_code', 'practice_code', 'specialty_code', 'atc',
-                        'pharma_central_number', 'speciality_of_prescriber',
-                        'qualificatoin', '']:
-                # Only convert to string if not already an object type
-                if df[col].dtype != 'object':
-                    df[col] = df[col].astype(str).replace('nan', pd.NA)
+            elif col in categorical_columns:
+                df[col] = df[col].replace('nan', pd.NA)
         
         # Log the number of NaN values in each column
         nan_counts = df.isna().sum()
@@ -435,6 +442,15 @@ def create_database(data_dir: str, force_recreate: bool = False) -> str:
     if db_path.exists() and not force_recreate:
         logging.info(f"Database {db_path} already exists. Skipping creation.")
         return str(db_path)
+    else:
+        # If force_recreate is True, delete the existing database file
+        if db_path.exists():
+            try:
+                os.remove(db_path)
+                logging.info(f"Existing database {db_path} has been deleted.")
+            except Exception as e:
+                logging.error(f"Error deleting existing database {db_path}: {e}")
+                raise
     
     # Scan directory for CSV files
     csv_files = {}
