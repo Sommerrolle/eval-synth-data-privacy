@@ -90,6 +90,8 @@ DTYPES = {
         'caseID': 'Int64',
         'procedure code': str,
         'localisation': 'Int64',
+        'specialty code': str,
+        'physican code': str
     },
     'drugs': {
         'pid': int,
@@ -135,7 +137,7 @@ COLUMN_TYPE_MAPPINGS = {
         'drugs_date_of_dispense': 'DATE',
         'drugs_pharma_central_number': 'VARCHAR(9)',
         'drugs_specialty_of_prescriber': 'VARCHAR(2)',
-        'drugs_physican_code': 'VARCHAR(9)',
+        'drugs_physician_code': 'VARCHAR(9)',
         'drugs_practice_code': 'VARCHAR(9)',
         'drugs_quantity': 'DOUBLE',
         'drugs_amount_due': 'DOUBLE',
@@ -162,7 +164,7 @@ COLUMN_TYPE_MAPPINGS = {
     'outpatient_fees': {  # Renamed from outpatients_fees
         'pid': 'INTEGER',
         'outpatient_caseID': 'INTEGER',
-        'outpatient_fees_physican_code': 'VARCHAR',
+        'outpatient_fees_physician_code': 'VARCHAR',
         'outpatient_fees_specialty_code': 'VARCHAR',
         'outpatient_fees_billing_code': 'VARCHAR',
         'outpatient_fees_quantity': 'DOUBLE',
@@ -173,7 +175,9 @@ COLUMN_TYPE_MAPPINGS = {
         'outpatient_caseID': 'INTEGER',
         'outpatient_procedures_procedure_code': 'VARCHAR',
         'outpatient_procedures_localisation': 'INTEGER',
-        'outpatient_procedures_date_of_procedure': 'DATE'
+        'outpatient_procedures_date_of_procedure': 'DATE',
+        'outpatient_procedures_specialty_code': 'VARCHAR(2)',
+        'outpatient_procedures_physician_code': 'VARCHAR'
     },
     'inpatient_cases': {
         'inpatient_caseID': 'INTEGER',
@@ -212,7 +216,7 @@ COLUMN_TYPE_MAPPINGS = {
     }
 }
 
-def rename_columns(df: pd.DataFrame, prefix: str, exceptions: List[str] = None, 
+def rename_columns(df: pd.DataFrame, prefix: str, exceptions: List[str] = None,
                   dataset_type: str = None) -> pd.DataFrame:
     """Rename DataFrame columns with consistent formatting."""
     if exceptions is None:
@@ -221,13 +225,18 @@ def rename_columns(df: pd.DataFrame, prefix: str, exceptions: List[str] = None,
     def rename_column(col_name: str) -> str:
         if col_name in exceptions:
             return col_name
-        if col_name == "caseID":
+        
+        # First fix common misspellings
+        fixed_col_name = col_name.replace('physican', 'physician')
+        
+        if fixed_col_name == "caseID":
             if dataset_type == "inpatient":
                 return "inpatient_caseID"
             elif dataset_type == "outpatient":
                 return "outpatient_caseID"
-        return f"{prefix}_{col_name.strip().replace(' ', '_').lower()}"
-
+        
+        return f"{prefix}_{fixed_col_name.strip().replace(' ', '_').lower()}"
+    
     return df.rename(columns=rename_column)
 
 def read_csv_file(filepath: str, col_types: Dict, table_name: str) -> pd.DataFrame:

@@ -6,9 +6,11 @@ merged_output.csv
 .local
 .pynb_checkpoints
 *_merged
+.vscode
 
 *.duckdb
 *.log
 *.csv
 __pycache__
 logs
+data
