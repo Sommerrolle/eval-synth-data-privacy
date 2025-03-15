@@ -1050,7 +1050,7 @@ class HealthClaimsPreprocessor:
     def move_preprocessed_tables_to_new_db(self, keep_original: bool = False) -> str:
         """
         Create a new database with a "_preprocessed" suffix and move all preprocessed 
-        tables to this new database.
+        tables to this new database using SQL ATTACH statement.
         
         Args:
             keep_original: If True, keep the preprocessed tables in the original database
@@ -1059,7 +1059,6 @@ class HealthClaimsPreprocessor:
         Returns:
             Path to the new database
         """
-        
         # Determine the new database name
         original_db_path = self.db_path
         original_db_name = os.path.basename(original_db_path)
@@ -1074,6 +1073,15 @@ class HealthClaimsPreprocessor:
         # Create new database name
         new_db_name = f"{base_name}_preprocessed.duckdb"
         new_db_path = os.path.join(original_db_dir, new_db_name)
+
+        # Delete the database if it already exists
+        if os.path.exists(new_db_path):
+            try:
+                os.remove(new_db_path)
+                logging.info(f"Existing database {new_db_path} has been deleted.")
+            except Exception as e:
+                logging.error(f"Error deleting existing database {new_db_path}: {e}")
+                return None
         
         logging.info(f"Creating new database: {new_db_path}")
         
@@ -1087,69 +1095,48 @@ class HealthClaimsPreprocessor:
             logging.warning(f"No preprocessed tables found in {original_db_path}")
             return None
         
-        logging.info(f"Found {len(preprocessed_tables)} preprocessed tables to move to new database")
-        
-        # Create new database (or connect to existing one)
-        if os.path.exists(new_db_path):
-            logging.warning(f"Database {new_db_path} already exists. Tables will be added or replaced.")
-        
-        # Create connections to both databases
-        conn_orig = duckdb.connect(original_db_path, read_only=False)
+        # Create new database connection
         conn_new = duckdb.connect(new_db_path, read_only=False)
         
         try:
+            # Attach the original database
+            conn_new.execute(f"ATTACH '{original_db_path}' AS orig")
+            
             # Copy each preprocessed table to the new database
             for table_name in preprocessed_tables:
                 start_time = time.time()
                 logging.info(f"Moving table {table_name} to new database...")
                 
-                # Get the table structure from the original database
-                table_info = conn_orig.execute(f"DESCRIBE {table_name}").fetchall()
-                column_defs = []
-                
-                for col_info in table_info:
-                    col_name = col_info[0]
-                    col_type = col_info[1]
-                    column_defs.append(f"{col_name} {col_type}")
-                
-                # Create the table in the new database
-                create_table_sql = f"CREATE TABLE IF NOT EXISTS {table_name} ({', '.join(column_defs)})"
-                conn_new.execute(create_table_sql)
-                
-                # Copy data using an attach command
-                conn_new.execute(f"ATTACH '{original_db_path}' AS orig")
-                
-                # Drop existing data and insert new
-                conn_new.execute(f"DELETE FROM {table_name}")
-                conn_new.execute(f"INSERT INTO {table_name} SELECT * FROM orig.{table_name}")
-                
-                # Detach the original database
-                conn_new.execute("DETACH orig")
+                # Create the table in the new database from the original
+                conn_new.execute(f"CREATE TABLE {table_name} AS SELECT * FROM orig.{table_name}")
                 
                 # Verify row count in new database matches original
-                orig_count = conn_orig.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
+                orig_count = conn_new.execute(f"SELECT COUNT(*) FROM orig.{table_name}").fetchone()[0]
                 new_count = conn_new.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
                 
                 if orig_count == new_count:
                     logging.info(f"Successfully copied {table_name}: {new_count:,} rows in {time.time() - start_time:.2f} seconds")
-                    
-                    # Drop the table from the original database if keep_original is False
-                    if not keep_original:
-                        conn_orig.execute(f"DROP TABLE {table_name}")
-                        logging.info(f"Dropped table {table_name} from original database")
                 else:
                     logging.error(f"Row count mismatch for {table_name}: Original={orig_count:,}, New={new_count:,}")
             
-            conn_new.close()
-            conn_orig.close()
+            # Detach the original database
+            conn_new.execute("DETACH orig")
+            
+            # If requested, drop the tables from the original database
+            if not keep_original:
+                conn_orig = duckdb.connect(original_db_path, read_only=False)
+                for table_name in preprocessed_tables:
+                    conn_orig.execute(f"DROP TABLE {table_name}")
+                    logging.info(f"Dropped table {table_name} from original database")
+                conn_orig.close()
             
             return new_db_path
             
         except Exception as e:
             logging.error(f"Error moving preprocessed tables: {str(e)}")
-            conn_new.close()
-            conn_orig.close()
             return None
+        finally:
+            conn_new.close()
 
 
 def main():
