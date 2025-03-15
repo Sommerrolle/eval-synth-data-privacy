@@ -92,15 +92,15 @@ class HealthClaimsPreprocessor:
         self.table_order = [
             'insurants',           # Patient data (center of star schema)
             'insurance_data',      # Insurance coverage info
-            # 'inpatient_cases',     # Inpatient visits
-            # 'outpatient_cases',    # Outpatient visits
-            # 'inpatient_diagnosis', # Inpatient diagnoses
-            # 'outpatient_diagnosis', # Outpatient diagnoses
-            # 'inpatient_procedures', # Inpatient procedures
-            # 'outpatient_procedures', # Outpatient procedures
-            # 'inpatient_fees',      # Inpatient billing
-            # 'outpatient_fees',     # Outpatient billing
-            # 'drugs'                # Medication data
+            'inpatient_cases',     # Inpatient visits
+            'outpatient_cases',    # Outpatient visits
+            'inpatient_diagnosis', # Inpatient diagnoses
+            'outpatient_diagnosis', # Outpatient diagnoses
+            'inpatient_procedures', # Inpatient procedures
+            'outpatient_procedures', # Outpatient procedures
+            'inpatient_fees',      # Inpatient billing
+            'outpatient_fees',     # Outpatient billing
+            'drugs'                # Medication data
         ]
     
     def preprocess_all_tables(self):
@@ -327,7 +327,7 @@ class HealthClaimsPreprocessor:
         elif 'DOUBLE' in col_type_upper or 'FLOAT' in col_type_upper:
             return "0.0"
         elif 'DATE' in col_type_upper or 'TIMESTAMP' in col_type_upper:
-            return "'2000-01-01'"
+            return "'2510-01-01'"
         elif 'VARCHAR' in col_type_upper or 'CHAR' in col_type_upper or 'TEXT' in col_type_upper:
             # Special handling for specific columns
             if 'diagnosis' in col_name.lower():
@@ -450,41 +450,11 @@ class HealthClaimsPreprocessor:
         
         if 'date_of_prescription' in col_lower:
             return f"""
-                COALESCE({col_name}, 
-                    (SELECT drugs_date_of_dispense - INTERVAL '3 days' 
-                     FROM drugs d
-                     WHERE d.pid = drugs.pid 
-                       AND d.drugs_date_of_dispense IS NOT NULL 
-                       AND d.drugs_date_of_dispense = drugs.drugs_date_of_dispense
-                     LIMIT 1),
-                    (SELECT MIN(drugs_date_of_prescription) 
-                     FROM drugs 
-                     WHERE pid = drugs.pid AND drugs_date_of_prescription IS NOT NULL
-                     LIMIT 1),
-                    (SELECT MIN(drugs_date_of_prescription) 
-                     FROM drugs 
-                     WHERE drugs_date_of_prescription IS NOT NULL),
-                    DATE '2000-01-01'
-                ) AS {col_name}
+                COALESCE({col_name}, DATE '2510-01-01') AS {col_name}
             """
         elif 'date_of_dispense' in col_lower:
             return f"""
-                COALESCE({col_name}, 
-                    (SELECT drugs_date_of_prescription + INTERVAL '3 days' 
-                     FROM drugs d
-                     WHERE d.pid = drugs.pid 
-                       AND d.drugs_date_of_prescription IS NOT NULL 
-                       AND d.drugs_date_of_prescription = drugs.drugs_date_of_prescription
-                     LIMIT 1),
-                    (SELECT MIN(drugs_date_of_dispense) 
-                     FROM drugs 
-                     WHERE pid = drugs.pid AND drugs_date_of_dispense IS NOT NULL
-                     LIMIT 1),
-                    (SELECT MIN(drugs_date_of_dispense) 
-                     FROM drugs 
-                     WHERE drugs_date_of_dispense IS NOT NULL),
-                    DATE '2000-01-02'
-                ) AS {col_name}
+                COALESCE({col_name}, DATE '2510-01-01') AS {col_name}
             """
         elif 'pharma_central_number' in col_lower:
             return f"""
@@ -504,28 +474,19 @@ class HealthClaimsPreprocessor:
             """
         elif 'quantity' in col_lower:
             return f"""
-                COALESCE({col_name}, 
-                    (SELECT MEDIAN({col_name}) FROM drugs WHERE {col_name} IS NOT NULL),
-                    1.0
-                ) AS {col_name}
+                COALESCE({col_name}, 0.0) AS {col_name}
             """
         elif 'amount_due' in col_lower:
             return f"""
-                COALESCE({col_name}, 
-                    (SELECT MEDIAN({col_name}) FROM drugs WHERE {col_name} IS NOT NULL),
-                    0.0
-                ) AS {col_name}
+                COALESCE({col_name}, 0.0) AS {col_name}
             """
         elif 'atc' in col_lower:
             return f"""
-                COALESCE({col_name}, 'A00A000') AS {col_name}
+                COALESCE({col_name}, 'UNKNOWN') AS {col_name}
             """
         elif 'ddd' in col_lower:
             return f"""
-                COALESCE({col_name}, 
-                    (SELECT MEDIAN({col_name}) FROM drugs WHERE {col_name} IS NOT NULL),
-                    1.0
-                ) AS {col_name}
+                COALESCE({col_name}, 0.0) AS {col_name}
             """
         else:
             return self._impute_generic_column(col_name, col_type, 'drugs')
@@ -541,11 +502,7 @@ class HealthClaimsPreprocessor:
                      FROM inpatient_cases ic
                      WHERE ic.inpatient_caseID = inpatient_cases.inpatient_caseID 
                        AND ic.inpatient_cases_date_of_discharge IS NOT NULL 
-                     LIMIT 1),
-                    (SELECT MIN(inpatient_cases_date_of_admission) 
-                     FROM inpatient_cases 
-                     WHERE pid = inpatient_cases.pid AND inpatient_cases_date_of_admission IS NOT NULL),
-                    DATE '2000-01-01'
+                     LIMIT 1)
                 ) AS {col_name}
             """
         elif 'date_of_discharge' in col_lower:
@@ -555,11 +512,7 @@ class HealthClaimsPreprocessor:
                      FROM inpatient_cases ic
                      WHERE ic.inpatient_caseID = inpatient_cases.inpatient_caseID 
                        AND ic.inpatient_cases_date_of_admission IS NOT NULL 
-                     LIMIT 1),
-                    (SELECT MAX(inpatient_cases_date_of_discharge) 
-                     FROM inpatient_cases 
-                     WHERE pid = inpatient_cases.pid AND inpatient_cases_date_of_discharge IS NOT NULL),
-                    DATE '2000-01-06'
+                     LIMIT 1)
                 ) AS {col_name}
             """
         elif 'cause_of_admission' in col_lower:
@@ -605,11 +558,18 @@ class HealthClaimsPreprocessor:
         
         if 'practice_code' in col_lower:
             return f"""
-                COALESCE({col_name}, 
-                    (SELECT {col_name} 
-                     FROM outpatient_cases 
-                     WHERE pid = outpatient_cases.pid AND {col_name} IS NOT NULL 
-                     LIMIT 1),
+                COALESCE({col_name},
+                    (SELECT oc.{col_name}
+                    FROM outpatient_cases oc
+                    WHERE oc.pid = outpatient_cases.pid
+                    AND oc.outpatient_caseID = outpatient_cases.outpatient_caseID
+                    AND oc.{col_name} IS NOT NULL
+                    LIMIT 1),
+                    (SELECT oc.{col_name}
+                    FROM outpatient_cases oc
+                    WHERE oc.pid = outpatient_cases.pid
+                    AND oc.{col_name} IS NOT NULL
+                    LIMIT 1),
                     '000000000'
                 ) AS {col_name}
             """
@@ -620,11 +580,7 @@ class HealthClaimsPreprocessor:
                      FROM outpatient_cases oc
                      WHERE oc.outpatient_caseID = outpatient_cases.outpatient_caseID 
                        AND oc.outpatient_cases_to IS NOT NULL 
-                     LIMIT 1),
-                    (SELECT MIN(outpatient_cases_from) 
-                     FROM outpatient_cases 
-                     WHERE pid = outpatient_cases.pid AND outpatient_cases_from IS NOT NULL),
-                    DATE '2000-01-01'
+                     LIMIT 1)
                 ) AS {col_name}
             """
         elif 'to' in col_lower:
@@ -634,11 +590,7 @@ class HealthClaimsPreprocessor:
                      FROM outpatient_cases oc
                      WHERE oc.outpatient_caseID = outpatient_cases.outpatient_caseID 
                        AND oc.outpatient_cases_from IS NOT NULL 
-                     LIMIT 1),
-                    (SELECT MAX(outpatient_cases_to) 
-                     FROM outpatient_cases 
-                     WHERE pid = outpatient_cases.pid AND outpatient_cases_to IS NOT NULL),
-                    DATE '2000-01-15'
+                     LIMIT 1)
                 ) AS {col_name}
             """
         elif 'amount_due' in col_lower:
@@ -655,8 +607,7 @@ class HealthClaimsPreprocessor:
                      FROM outpatient_cases oc
                      WHERE oc.outpatient_caseID = outpatient_cases.outpatient_caseID 
                        AND oc.outpatient_cases_from IS NOT NULL 
-                     LIMIT 1),
-                    2000
+                     LIMIT 1)
                 ) AS {col_name}
             """
         elif 'quarter' in col_lower:
@@ -667,7 +618,7 @@ class HealthClaimsPreprocessor:
                      WHERE oc.outpatient_caseID = outpatient_cases.outpatient_caseID 
                        AND oc.outpatient_cases_from IS NOT NULL 
                      LIMIT 1),
-                    1
+                    (1 + CAST(RANDOM() * 3 AS INTEGER))  -- Random number between 1-4
                 ) AS {col_name}
             """
         else:
@@ -683,7 +634,7 @@ class HealthClaimsPreprocessor:
             """
         elif 'type_of_diagnosis' in col_lower:
             return f"""
-                COALESCE({col_name}, 'HD') AS {col_name}
+                COALESCE({col_name}, '00') AS {col_name}
             """
         elif 'is_main_diagnosis' in col_lower:
             return f"""
@@ -706,7 +657,7 @@ class HealthClaimsPreprocessor:
             """
         elif 'qualification' in col_lower:
             return f"""
-                COALESCE({col_name}, 'Z') AS {col_name}
+                COALESCE({col_name}, 'U') AS {col_name}
             """
         elif 'localisation' in col_lower:
             return f"""
@@ -734,11 +685,7 @@ class HealthClaimsPreprocessor:
                      FROM inpatient_cases ic
                      WHERE ic.inpatient_caseID = inpatient_procedures.inpatient_caseID 
                        AND ic.inpatient_cases_date_of_admission IS NOT NULL 
-                     LIMIT 1),
-                    (SELECT MEDIAN({col_name}) 
-                     FROM inpatient_procedures 
-                     WHERE {col_name} IS NOT NULL),
-                    DATE '2000-01-02'
+                     LIMIT 1)
                 ) AS {col_name}
             """
         else:
@@ -754,29 +701,51 @@ class HealthClaimsPreprocessor:
             """
         elif 'localisation' in col_lower:
             return f"""
-                COALESCE({col_name}, 0) AS {col_name}
+                COALESCE({col_name},
+                    (SELECT op.outpatient_procedures_localisation
+                    FROM outpatient_procedures op
+                    WHERE op.pid = outpatient_procedures.pid
+                        AND op.outpatient_procedures_localisation IS NOT NULL
+                    ORDER BY RANDOM()
+                    LIMIT 1),
+                    0
+                ) AS {col_name}
             """
         elif 'date_of_procedure' in col_lower:
-            # Being careful with string dates
             return f"""
-                COALESCE({col_name}, 
-                    (SELECT CASE 
-                        WHEN outpatient_cases_from IS NOT NULL THEN TO_VARCHAR(outpatient_cases_from, 'YYYY-MM-DD')
-                        ELSE '2000-01-01'
-                     END
-                     FROM outpatient_cases oc
-                     WHERE oc.outpatient_caseID = outpatient_procedures.outpatient_caseID
-                     LIMIT 1),
-                    '2000-01-01'
+                COALESCE({col_name},
+                    (SELECT outpatient_cases_from
+                    FROM outpatient_cases oc
+                    WHERE oc.outpatient_caseID = outpatient_procedures.outpatient_caseID
+                    AND oc.outpatient_cases_from IS NOT NULL
+                    LIMIT 1)
                 ) AS {col_name}
             """
         elif 'specialty_code' in col_lower:
             return f"""
-                COALESCE({col_name}, '00') AS {col_name}
+                COALESCE({col_name},
+                    (SELECT op.outpatient_procedures_specialty_code
+                    FROM outpatient_procedures op
+                    WHERE op.pid = outpatient_procedures.pid
+                        AND op.outpatient_procedures_procedure_code = outpatient_procedures.outpatient_procedures_procedure_code
+                        AND op.outpatient_procedures_specialty_code IS NOT NULL
+                    ORDER BY RANDOM()
+                    LIMIT 1),
+                    '00'
+                ) AS {col_name}
             """
-        elif 'physican_code' in col_lower:
+        elif 'physician_code' in col_lower:
             return f"""
-                COALESCE({col_name}, '000000000') AS {col_name}
+                COALESCE({col_name},
+                    (SELECT op.outpatient_procedures_physician_code
+                    FROM outpatient_procedures op
+                    WHERE op.pid = outpatient_procedures.pid
+                        AND op.outpatient_procedures_procedure_code = outpatient_procedures.outpatient_procedures_procedure_code
+                        AND op.outpatient_procedures_physician_code IS NOT NULL
+                    ORDER BY RANDOM()
+                    LIMIT 1),
+                    '000000000'
+                ) AS {col_name}
             """
         else:
             return self._impute_generic_column(col_name, col_type, 'outpatient_procedures')
@@ -785,35 +754,29 @@ class HealthClaimsPreprocessor:
         """Generate imputation for inpatient_fees table columns."""
         col_lower = col_name.lower()
         
-        if 'from' in col_lower and 'fees' in col_lower:
+        if 'from' in col_lower:
             return f"""
-                COALESCE({col_name}, 
-                    (SELECT CASE 
-                        WHEN inpatient_cases_date_of_admission IS NOT NULL THEN TO_VARCHAR(inpatient_cases_date_of_admission, 'YYYY-MM-DD')
-                        ELSE '2000-01-01'
-                     END
-                     FROM inpatient_cases ic
-                     WHERE ic.inpatient_caseID = inpatient_fees.inpatient_caseID
-                     LIMIT 1),
-                    '2000-01-01'
+                COALESCE({col_name},
+                    (SELECT inpatient_cases_date_of_admission
+                    FROM inpatient_cases ic
+                    WHERE ic.inpatient_caseID = inpatient_fees.inpatient_caseID
+                    AND ic.inpatient_cases_date_of_admission IS NOT NULL
+                    LIMIT 1)
                 ) AS {col_name}
             """
-        elif 'to' in col_lower and 'fees' in col_lower:
+        elif 'to' in col_lower:
             return f"""
-                COALESCE({col_name}, 
-                    (SELECT CASE 
-                        WHEN inpatient_cases_date_of_discharge IS NOT NULL THEN TO_VARCHAR(inpatient_cases_date_of_discharge, 'YYYY-MM-DD')
-                        ELSE '2000-01-05'
-                     END
-                     FROM inpatient_cases ic
-                     WHERE ic.inpatient_caseID = inpatient_fees.inpatient_caseID
-                     LIMIT 1),
-                    '2000-01-05'
+                COALESCE({col_name},
+                    (SELECT inpatient_cases_date_of_discharge
+                    FROM inpatient_cases ic
+                    WHERE ic.inpatient_caseID = inpatient_fees.inpatient_caseID
+                    AND ic.inpatient_cases_date_of_discharge IS NOT NULL
+                    LIMIT 1)
                 ) AS {col_name}
             """
         elif 'billing_code' in col_lower:
             return f"""
-                COALESCE({col_name}, '00000') AS {col_name}
+                COALESCE({col_name}, 'UNKNOWN') AS {col_name}
             """
         elif 'amount_due' in col_lower:
             return f"""
@@ -836,7 +799,7 @@ class HealthClaimsPreprocessor:
         """Generate imputation for outpatient_fees table columns."""
         col_lower = col_name.lower()
         
-        if 'physican_code' in col_lower:
+        if 'physician_code' in col_lower:
             return f"""
                 COALESCE({col_name}, '000000000') AS {col_name}
             """
@@ -846,26 +809,21 @@ class HealthClaimsPreprocessor:
             """
         elif 'billing_code' in col_lower:
             return f"""
-                COALESCE({col_name}, '00000') AS {col_name}
+                COALESCE({col_name}, 'UNKNOWN') AS {col_name}
             """
         elif 'quantity' in col_lower:
             return f"""
-                COALESCE({col_name}, 
-                    (SELECT MEDIAN({col_name}) FROM outpatient_fees WHERE {col_name} IS NOT NULL),
-                    1.0
-                ) AS {col_name}
+                COALESCE({col_name}, 1) AS {col_name}
             """
         elif 'date' in col_lower:
             return f"""
-                COALESCE({col_name}, 
-                    (SELECT CASE 
-                        WHEN outpatient_cases_from IS NOT NULL THEN TO_VARCHAR(outpatient_cases_from, 'YYYY-MM-DD')
-                        ELSE '2000-01-01'
-                     END
-                     FROM outpatient_cases oc
-                     WHERE oc.outpatient_caseID = outpatient_fees.outpatient_caseID
-                     LIMIT 1),
-                    '2000-01-01'
+                COALESCE({col_name},
+                    (SELECT outpatient_cases_from
+                    FROM outpatient_cases oc
+                    WHERE oc.outpatient_caseID = outpatient_fees.outpatient_caseID
+                    AND oc.outpatient_cases_from IS NOT NULL
+                    LIMIT 1),
+                    DATE '2510-01-01'
                 ) AS {col_name}
             """
         else:
@@ -1089,109 +1047,109 @@ class HealthClaimsPreprocessor:
             conn.close()
 
 
-def move_preprocessed_tables_to_new_db(self, keep_original: bool = False) -> str:
-    """
-    Create a new database with a "_preprocessed" suffix and move all preprocessed 
-    tables to this new database.
-    
-    Args:
-        keep_original: If True, keep the preprocessed tables in the original database
-                       If False, drop the preprocessed tables from the original database
-    
-    Returns:
-        Path to the new database
-    """
-    
-    # Determine the new database name
-    original_db_path = self.db_path
-    original_db_name = os.path.basename(original_db_path)
-    original_db_dir = os.path.dirname(original_db_path)
-    
-    # Strip .duckdb extension if present
-    if original_db_name.endswith('.duckdb'):
-        base_name = original_db_name[:-7]
-    else:
-        base_name = original_db_name
-    
-    # Create new database name
-    new_db_name = f"{base_name}_preprocessed.duckdb"
-    new_db_path = os.path.join(original_db_dir, new_db_name)
-    
-    logging.info(f"Creating new database: {new_db_path}")
-    
-    # Get all preprocessed tables from the original database
-    conn = duckdb.connect(original_db_path, read_only=True)
-    all_tables = conn.execute("SHOW TABLES").fetchall()
-    preprocessed_tables = [table[0] for table in all_tables if table[0].startswith(self.output_prefix)]
-    conn.close()
-    
-    if not preprocessed_tables:
-        logging.warning(f"No preprocessed tables found in {original_db_path}")
-        return None
-    
-    logging.info(f"Found {len(preprocessed_tables)} preprocessed tables to move to new database")
-    
-    # Create new database (or connect to existing one)
-    if os.path.exists(new_db_path):
-        logging.warning(f"Database {new_db_path} already exists. Tables will be added or replaced.")
-    
-    # Create connections to both databases
-    conn_orig = duckdb.connect(original_db_path, read_only=False)
-    conn_new = duckdb.connect(new_db_path, read_only=False)
-    
-    try:
-        # Copy each preprocessed table to the new database
-        for table_name in preprocessed_tables:
-            start_time = time.time()
-            logging.info(f"Moving table {table_name} to new database...")
-            
-            # Get the table structure from the original database
-            table_info = conn_orig.execute(f"DESCRIBE {table_name}").fetchall()
-            column_defs = []
-            
-            for col_info in table_info:
-                col_name = col_info[0]
-                col_type = col_info[1]
-                column_defs.append(f"{col_name} {col_type}")
-            
-            # Create the table in the new database
-            create_table_sql = f"CREATE TABLE IF NOT EXISTS {table_name} ({', '.join(column_defs)})"
-            conn_new.execute(create_table_sql)
-            
-            # Copy data using an attach command
-            conn_new.execute(f"ATTACH '{original_db_path}' AS orig")
-            
-            # Drop existing data and insert new
-            conn_new.execute(f"DELETE FROM {table_name}")
-            conn_new.execute(f"INSERT INTO {table_name} SELECT * FROM orig.{table_name}")
-            
-            # Detach the original database
-            conn_new.execute("DETACH orig")
-            
-            # Verify row count in new database matches original
-            orig_count = conn_orig.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
-            new_count = conn_new.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
-            
-            if orig_count == new_count:
-                logging.info(f"Successfully copied {table_name}: {new_count:,} rows in {time.time() - start_time:.2f} seconds")
+    def move_preprocessed_tables_to_new_db(self, keep_original: bool = False) -> str:
+        """
+        Create a new database with a "_preprocessed" suffix and move all preprocessed 
+        tables to this new database.
+        
+        Args:
+            keep_original: If True, keep the preprocessed tables in the original database
+                        If False, drop the preprocessed tables from the original database
+        
+        Returns:
+            Path to the new database
+        """
+        
+        # Determine the new database name
+        original_db_path = self.db_path
+        original_db_name = os.path.basename(original_db_path)
+        original_db_dir = os.path.dirname(original_db_path)
+        
+        # Strip .duckdb extension if present
+        if original_db_name.endswith('.duckdb'):
+            base_name = original_db_name[:-7]
+        else:
+            base_name = original_db_name
+        
+        # Create new database name
+        new_db_name = f"{base_name}_preprocessed.duckdb"
+        new_db_path = os.path.join(original_db_dir, new_db_name)
+        
+        logging.info(f"Creating new database: {new_db_path}")
+        
+        # Get all preprocessed tables from the original database
+        conn = duckdb.connect(original_db_path, read_only=True)
+        all_tables = conn.execute("SHOW TABLES").fetchall()
+        preprocessed_tables = [table[0] for table in all_tables if table[0].startswith(self.output_prefix)]
+        conn.close()
+        
+        if not preprocessed_tables:
+            logging.warning(f"No preprocessed tables found in {original_db_path}")
+            return None
+        
+        logging.info(f"Found {len(preprocessed_tables)} preprocessed tables to move to new database")
+        
+        # Create new database (or connect to existing one)
+        if os.path.exists(new_db_path):
+            logging.warning(f"Database {new_db_path} already exists. Tables will be added or replaced.")
+        
+        # Create connections to both databases
+        conn_orig = duckdb.connect(original_db_path, read_only=False)
+        conn_new = duckdb.connect(new_db_path, read_only=False)
+        
+        try:
+            # Copy each preprocessed table to the new database
+            for table_name in preprocessed_tables:
+                start_time = time.time()
+                logging.info(f"Moving table {table_name} to new database...")
                 
-                # Drop the table from the original database if keep_original is False
-                if not keep_original:
-                    conn_orig.execute(f"DROP TABLE {table_name}")
-                    logging.info(f"Dropped table {table_name} from original database")
-            else:
-                logging.error(f"Row count mismatch for {table_name}: Original={orig_count:,}, New={new_count:,}")
-        
-        conn_new.close()
-        conn_orig.close()
-        
-        return new_db_path
-        
-    except Exception as e:
-        logging.error(f"Error moving preprocessed tables: {str(e)}")
-        conn_new.close()
-        conn_orig.close()
-        return None
+                # Get the table structure from the original database
+                table_info = conn_orig.execute(f"DESCRIBE {table_name}").fetchall()
+                column_defs = []
+                
+                for col_info in table_info:
+                    col_name = col_info[0]
+                    col_type = col_info[1]
+                    column_defs.append(f"{col_name} {col_type}")
+                
+                # Create the table in the new database
+                create_table_sql = f"CREATE TABLE IF NOT EXISTS {table_name} ({', '.join(column_defs)})"
+                conn_new.execute(create_table_sql)
+                
+                # Copy data using an attach command
+                conn_new.execute(f"ATTACH '{original_db_path}' AS orig")
+                
+                # Drop existing data and insert new
+                conn_new.execute(f"DELETE FROM {table_name}")
+                conn_new.execute(f"INSERT INTO {table_name} SELECT * FROM orig.{table_name}")
+                
+                # Detach the original database
+                conn_new.execute("DETACH orig")
+                
+                # Verify row count in new database matches original
+                orig_count = conn_orig.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
+                new_count = conn_new.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
+                
+                if orig_count == new_count:
+                    logging.info(f"Successfully copied {table_name}: {new_count:,} rows in {time.time() - start_time:.2f} seconds")
+                    
+                    # Drop the table from the original database if keep_original is False
+                    if not keep_original:
+                        conn_orig.execute(f"DROP TABLE {table_name}")
+                        logging.info(f"Dropped table {table_name} from original database")
+                else:
+                    logging.error(f"Row count mismatch for {table_name}: Original={orig_count:,}, New={new_count:,}")
+            
+            conn_new.close()
+            conn_orig.close()
+            
+            return new_db_path
+            
+        except Exception as e:
+            logging.error(f"Error moving preprocessed tables: {str(e)}")
+            conn_new.close()
+            conn_orig.close()
+            return None
 
 
 def main():
@@ -1211,7 +1169,8 @@ def main():
     # Use default arguments if none provided
     if len(sys.argv) == 1:
         print("No arguments provided. Using example values.")
-        args = parser.parse_args(['--db_path', 'data/duckdb/claims_data.duckdb'])
+        # args = parser.parse_args(['--db_path', 'duckdb\claims_data.duckdb'])
+        args = parser.parse_args(['--db_path', 'duckdb\claims_data.duckdb', '--new_db'])
     else:
         args = parser.parse_args()
     

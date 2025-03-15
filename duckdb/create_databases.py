@@ -277,24 +277,10 @@ def read_csv_file(filepath: str, col_types: Dict, table_name: str) -> pd.DataFra
         
         #Handle specific column types that might need additional processing
         for col in df.columns:
-            col_lower = col.lower()
-            # Handle amount columns
-            # if 'amount' in col_lower:
-            #     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
-            # # Handle quantity columns
-            # elif 'quantity' in col_lower:
-            #     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
-            # # Handle DDD (Defined Daily Dose)
-            # elif col_lower == 'ddd':
-            #     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
-            if any(keyword in col_lower for keyword in numercial_float_columns):
-                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
-            # elif col_lower == 'localisation':
-            #     df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             # Handle categorical columns (keep NaN)
-            elif col in categorical_columns:
+            if col in categorical_columns:
                 df[col] = df[col].replace('nan', pd.NA)
-        
+
         # Log the number of NaN values in each column
         nan_counts = df.isna().sum()
         if nan_counts.any():
