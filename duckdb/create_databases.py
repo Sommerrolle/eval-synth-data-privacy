@@ -16,7 +16,7 @@ logging.basicConfig(
 )
 
 # Define constants
-DUCKDB_DIR = 'duckdb'
+DUCKDB_DIR = 'data/duckdb'
 CSV_PREFIX = 'sle.'
 CSV_SUFFIX = '.csv'
 

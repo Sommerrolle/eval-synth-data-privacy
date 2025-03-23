@@ -57,7 +57,7 @@ class DuckDBManager:
         """
         try:
             conn = duckdb.connect(db_path, read_only=True)
-            tables = conn.execute("SELECT table_name FROM information_schema.tables WHERE table_name LIKE 'joined%'").fetchall()
+            tables = conn.execute("SELECT table_name FROM information_schema.tables WHERE table_name LIKE 'join%'").fetchall()
             return [table[0] for table in tables]
         except Exception as e:
             logging.error(f"Error retrieving joined tables from {db_path}: {str(e)}")

@@ -1106,13 +1106,14 @@ class HealthClaimsPreprocessor:
             for table_name in preprocessed_tables:
                 start_time = time.time()
                 logging.info(f"Moving table {table_name} to new database...")
+                table_name_new = table_name.replace('clean_', '')
                 
                 # Create the table in the new database from the original
-                conn_new.execute(f"CREATE TABLE {table_name} AS SELECT * FROM orig.{table_name}")
+                conn_new.execute(f"CREATE TABLE {table_name_new} AS SELECT * FROM orig.{table_name}")
                 
                 # Verify row count in new database matches original
                 orig_count = conn_new.execute(f"SELECT COUNT(*) FROM orig.{table_name}").fetchone()[0]
-                new_count = conn_new.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
+                new_count = conn_new.execute(f"SELECT COUNT(*) FROM {table_name_new}").fetchone()[0]
                 
                 if orig_count == new_count:
                     logging.info(f"Successfully copied {table_name}: {new_count:,} rows in {time.time() - start_time:.2f} seconds")
