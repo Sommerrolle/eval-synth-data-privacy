@@ -54,7 +54,7 @@ DTYPES = {
         'caseID': 'Int64',
         'billing code': str,
         'amount due': float,
-        'quantity': 'Int64'
+        'quantity': float
     },
     'inpatient_procedures': {
         'pid': int,
@@ -83,7 +83,7 @@ DTYPES = {
         'physican code': str,
         'specialty code': str,
         'billing code': str,
-        'quantity': 'Int64',
+        'quantity': float
     },
     'outpatient_procedures': {
         'pid': int,
