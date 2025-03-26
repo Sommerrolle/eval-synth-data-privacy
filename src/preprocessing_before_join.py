@@ -1158,7 +1158,8 @@ def main():
     if len(sys.argv) == 1:
         print("No arguments provided. Using example values.")
         # args = parser.parse_args(['--db_path', 'duckdb\claims_data.duckdb'])
-        args = parser.parse_args(['--db_path', 'duckdb\claims_data.duckdb', '--new_db'])
+        #args = parser.parse_args(['--db_path', 'duckdb\claims_data.duckdb', '--new_db'])
+        #args = parser.parse_args(['--db_path', 'duckdb/limebit_bn.duckdb', '--new_db'])
     else:
         args = parser.parse_args()
     
