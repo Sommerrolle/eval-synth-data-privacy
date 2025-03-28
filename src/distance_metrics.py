@@ -13,6 +13,7 @@ from pathlib import Path
 
 # Import your duckdb_manager
 from duckdb_manager import DuckDBManager
+from pca_analysis import analyze_principal_components
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,7 +24,7 @@ logging.basicConfig(
     ]
 )
 
-class PrivacyMetricsCalculator:
+class DistanceMetricsCalculator:
     """Calculate privacy metrics between original and synthetic datasets."""
     
     def __init__(self, results_dir='results/privacy_metrics'):
@@ -31,159 +32,100 @@ class PrivacyMetricsCalculator:
         self.results_dir = results_dir
         os.makedirs(results_dir, exist_ok=True)
         self.db_manager = DuckDBManager()
-        
-    def detect_mixed_type_columns(self, df):
+    
+    
+    def preprocess_dataframes(self, df1, df2):
         """
-        Detect columns with mixed data types and categorize columns as numeric, timestamp, or string.
+        Preprocess two dataframes to standardize column types and handle special columns.
         
         Args:
-            df: DataFrame to analyze
+            df1: First DataFrame
+            df2: Second DataFrame
             
         Returns:
-            Tuple of (mixed_columns, numeric_cols, timestamp_cols, string_cols)
+            Tuple of (df1, df2, numeric_cols, string_cols) with standardized types
         """
-        mixed_columns = []
-        numeric_cols = []
+        # Get common columns
+        common_cols = list(set(df1.columns).intersection(set(df2.columns)))
+        df1 = df1[common_cols].copy()
+        df2 = df2[common_cols].copy()
+        
+        logging.info(f"Preprocessing {len(common_cols)} common columns")
+        
+        # 1. First, identify special column types for preprocessing
+        diagnosis_cols = [col for col in common_cols if "diagnosis_diagnosis" in col.lower()]
+        procedure_cols = [col for col in common_cols if "procedure_code" in col.lower()]
+        
+        # Identify potential timestamp columns (we'll convert these later)
         timestamp_cols = []
-        string_cols = []
+        for col in common_cols:
+            col_lower = col.lower()
+            if any(term in col_lower for term in ["date", "time", "from", "to"]):
+                timestamp_cols.append(col)
         
-        for col in df.columns:
-            # Skip columns with all NaN values
-            if df[col].isna().all():
-                continue
-                
-            # Get non-null values and their types
-            non_null_values = df[col].dropna()
-            if len(non_null_values) == 0:
-                continue
-                
-            # Check types
-            types = set(type(x).__name__ for x in non_null_values)
-            
-            if len(types) > 1:
-                mixed_columns.append(col)
-                logging.warning(f"Column '{col}' has mixed types: {types}")
-                
-                # Check if it's primarily numeric
-                try:
-                    df[col] = pd.to_numeric(df[col], errors='coerce')
-                    if not df[col].isna().all():
-                        numeric_cols.append(col)
-                    else:
-                        # Try to convert to datetime
-                        try:
-                            df[col] = pd.to_datetime(df[col], errors='coerce')
-                            if not df[col].isna().all():
-                                timestamp_cols.append(col)
-                            else:
-                                # Default to string
-                                df[col] = df[col].astype(str)
-                                string_cols.append(col)
-                        except:
-                            df[col] = df[col].astype(str)
-                            string_cols.append(col)
-                except:
-                    # Not numeric, try datetime
-                    try:
-                        df[col] = pd.to_datetime(df[col], errors='coerce')
-                        if not df[col].isna().all():
-                            timestamp_cols.append(col)
-                        else:
-                            df[col] = df[col].astype(str)
-                            string_cols.append(col)
-                    except:
-                        df[col] = df[col].astype(str)
-                        string_cols.append(col)
-            else:
-                # Single type columns
-                type_name = list(types)[0]
-                if type_name in ('int', 'float', 'int64', 'float64', 'int32', 'float32'):
-                    numeric_cols.append(col)
-                elif type_name in ('Timestamp', 'datetime64[ns]', 'datetime'):
-                    timestamp_cols.append(col)
-                else:
-                    # Treat as string
-                    df[col] = df[col].astype(str)
-                    string_cols.append(col)
-        
-        return mixed_columns, numeric_cols, timestamp_cols, string_cols
-    
+        # 2. Convert medical codes (both diagnosis and procedure) to numerical values
+        all_medical_code_cols = []
+        if diagnosis_cols:
+            logging.info(f"Converting {len(diagnosis_cols)} diagnosis columns to numerical values")
+            all_medical_code_cols.extend(diagnosis_cols)
 
-    ## Function to check with comments if time conversion is correct
-    # def convert_timestamps_to_epoch(self, df, timestamp_cols, numeric_cols):
-    #     """
-    #     Convert timestamp columns to Unix epoch time (seconds since 1970-01-01).
-        
-    #     Args:
-    #         df: DataFrame to process
-    #         timestamp_cols: List of column names containing timestamp data
-    #         numeric_cols: List of numeric column names for the dataframe
+        if procedure_cols:
+            logging.info(f"Converting {len(procedure_cols)} procedure columns to numerical values")
+            all_medical_code_cols.extend(procedure_cols)
+
+        if all_medical_code_cols:
+            logging.info(f"Using simplified encoding for {len(all_medical_code_cols)} medical code columns")
+            df1 = self.encode_medical_codes(df1, all_medical_code_cols)
+            df2 = self.encode_medical_codes(df2, all_medical_code_cols)
             
-    #     Returns:
-    #         Tuple containing (df, updated_numeric_cols) with updated values
-    #     """
-    #     for col in timestamp_cols:
-    #         if col in df.columns:
-    #             # Print before conversion examples
-    #             sample_before = df[col].dropna().head(3).tolist()
-    #             print(f"\nBEFORE CONVERSION - Column '{col}' examples:")
-    #             print(f"  Data type: {df[col].dtype}")
-    #             print(f"  Sample values: {sample_before}")
-                
-    #             try:
-    #                 df[col] = pd.to_datetime(df[col], errors='coerce')
-                    
-    #                 # Print after datetime conversion
-    #                 sample_datetime = df[col].dropna().head(3).tolist()
-    #                 print(f"\nAFTER DATETIME CONVERSION - Column '{col}' examples:")
-    #                 print(f"  Data type: {df[col].dtype}")
-    #                 print(f"  Sample values: {sample_datetime}")
-                    
-    #                 # Log problematic values
-    #                 if df[col].isna().any():
-    #                     problematic_values = df.loc[df[col].isna(), col].head(5).tolist()
-    #                     logging.warning(f"Column '{col}' has {df[col].isna().sum()} values that couldn't be converted to datetime. Examples: {problematic_values}")
-    #                     print(f"  Warning: {df[col].isna().sum()} values couldn't be converted to datetime")
-    #                     if problematic_values:
-    #                         print(f"  Problem examples: {problematic_values}")
-                    
-    #                 # Convert to Unix timestamp (seconds since epoch)
-    #                 df[col] = df[col].apply(lambda x: x.timestamp() if pd.notna(x) else np.nan)
-                    
-    #                 # Print after timestamp conversion
-    #                 sample_after = df[col].dropna().head(3).tolist()
-    #                 print(f"\nAFTER EPOCH CONVERSION - Column '{col}' examples:")
-    #                 print(f"  Data type: {df[col].dtype}")
-    #                 print(f"  Sample values: {sample_after}")
-    #                 print(f"  Range: Min={df[col].min()}, Max={df[col].max()}")
-                    
-    #                 # Verify the conversion worked as expected
-    #                 if len(sample_datetime) > 0 and len(sample_after) > 0:
-    #                     print("\nVERIFICATION:")
-    #                     # Convert the first datetime back from timestamp and compare
-    #                     first_dt = sample_datetime[0]
-    #                     first_ts = sample_after[0]
-    #                     back_to_dt = pd.to_datetime(first_ts, unit='s')
-    #                     print(f"  Original datetime: {first_dt}")
-    #                     print(f"  As timestamp: {first_ts}")
-    #                     print(f"  Back to datetime: {back_to_dt}")
-    #                     print(f"  Conversion accurate: {first_dt.strftime('%Y-%m-%d %H:%M:%S') == back_to_dt.strftime('%Y-%m-%d %H:%M:%S')}")
-                    
-    #             except Exception as e:
-    #                 print(f"\nERROR: Failed to convert column '{col}' to timestamp: {str(e)}")
-    #                 logging.error(f"Failed to convert column '{col}' to timestamp: {str(e)}")
-    #                 # Force numeric conversion, set unconvertible values to NaN
-    #                 df[col] = pd.to_numeric(df[col], errors='coerce')
-    #                 print(f"  Fallback to numeric conversion. New dtype: {df[col].dtype}")
-                
-    #             # Add to numeric columns
-    #             if col not in numeric_cols:
-    #                 numeric_cols.append(col)
-    #                 print(f"  Added '{col}' to numeric columns list")
+            # Update common_cols after medical code conversion (original cols removed, new numeric cols added)
+            common_cols = list(set(df1.columns).intersection(set(df2.columns)))
+        
+        # # 3. Verify and convert timestamp columns
+        # timestamp_cols = []
+        # for col in potential_timestamp_cols:
+        #     if col in common_cols:  # Check if column still exists after medical code processing
+        #         try:
+        #             # Test if column can be converted to datetime
+        #             pd.to_datetime(df1[col].head(100), errors='raise')
+        #             pd.to_datetime(df2[col].head(100), errors='raise')
+        #             timestamp_cols.append(col)
+        #         except:
+        #             pass  # Not a timestamp column
+        
+        # Initialize numeric_cols list
+        numeric_cols = []
+        
+        # 4. Convert timestamp columns to Unix timestamps
+        if timestamp_cols:
+            logging.info(f"Converting {len(timestamp_cols)} timestamp columns to Unix timestamps")
+            df1, numeric_cols = self.convert_timestamps_to_epoch(df1, timestamp_cols, numeric_cols)
+            df2, numeric_cols = self.convert_timestamps_to_epoch(df2, timestamp_cols, numeric_cols)
+        
+        # 5. Now categorize remaining columns as numeric or string
+        remaining_cols = [col for col in common_cols if col not in timestamp_cols]
+        remaining_numeric, string_cols = self.categorize_columns(df1, df2, remaining_cols)
+
+        # Remove medical code cols from string cols
+        string_cols = [col for col in string_cols if col not in all_medical_code_cols]
+        
+        # Add remaining numeric columns to our numeric_cols list
+        numeric_cols.extend(remaining_numeric)
+        
+        # 6. Standardize the data types
+        for col in numeric_cols:
+            if col in df1.columns and col in df2.columns:  # Verify column exists
+                df1[col] = pd.to_numeric(df1[col], errors='coerce')
+                df2[col] = pd.to_numeric(df2[col], errors='coerce')
+        
+        for col in string_cols:
+            if col in df1.columns and col in df2.columns:  # Verify column exists
+                df1[col] = df1[col].astype(str)
+                df2[col] = df2[col].astype(str)
+        
+        return df1, df2, numeric_cols, string_cols
     
-    #     return df, numeric_cols
-    
-    def convert_timestamps_to_epoch(df, timestamp_cols, numeric_cols):
+    def convert_timestamps_to_epoch(self, df, timestamp_cols, numeric_cols):
         """
         Convert timestamp columns to Unix epoch time (seconds since 1970-01-01).
         
@@ -217,59 +159,178 @@ class PrivacyMetricsCalculator:
                     numeric_cols.append(col)
         
         return df, numeric_cols
-    
 
-    def standardize_column_types(self, df1, df2):
+    def categorize_columns(self, df1, df2, common_cols):
         """
-        Ensure both dataframes have the same column types.
+        Categorize columns as numeric or string based on their content.
         
         Args:
             df1: First DataFrame
             df2: Second DataFrame
+            common_cols: List of common column names
             
         Returns:
-            Tuple of (df1, df2, numeric_cols, string_cols) with standardized types
+            Tuple of (numeric_cols, string_cols)
         """
-        # Get common columns
-        common_cols = list(set(df1.columns).intersection(set(df2.columns)))
-        df1 = df1[common_cols].copy()
-        df2 = df2[common_cols].copy()
+        numeric_cols = []
+        string_cols = []
         
-        logging.info(f"Standardizing types for {len(common_cols)} common columns")
+        for col in common_cols:
+            # Try to convert to numeric
+            try:
+                test1 = pd.to_numeric(df1[col].dropna().head(100), errors='raise')
+                test2 = pd.to_numeric(df2[col].dropna().head(100), errors='raise')
+                # If both convert successfully, it's a numeric column
+                numeric_cols.append(col)
+            except:
+                # Otherwise, treat as string
+                string_cols.append(col)
         
-        # Detect mixed columns in each DataFrame
-        mixed1, numeric1, timestamp1, string1 = self.detect_mixed_type_columns(df1)
-        mixed2, numeric2, timestamp2, string2 = self.detect_mixed_type_columns(df2)
-        
-        # Get all mixed columns from both DataFrames
-        all_mixed = set(mixed1 + mixed2)
-        logging.info(f"Found {len(all_mixed)} columns with mixed types")
-        if all_mixed:
-            logging.info(f"Mixed type columns: {all_mixed}")
+        logging.info(f"Categorized columns: {len(numeric_cols)} numeric, {len(string_cols)} string")
+        return numeric_cols, string_cols
 
-        # Process timestamp columns - convert to epoch time (numeric)
-        timestamp_cols = list(set(timestamp1).union(set(timestamp2)))
+    def encode_medical_codes(self, df, code_columns):
+        """
+        Simplified encoding of medical codes by removing non-numeric characters,
+        except for the initial letter in ICD codes.
+        
+        Args:
+            df: DataFrame containing medical codes
+            code_columns: List of code columns to encode
+            
+        Returns:
+            DataFrame with encoded medical codes
+        """
+        df_encoded = df.copy()
+        
+        for col in code_columns:
+            if col not in df.columns:
+                continue
+                
+            # Create a new column for numeric representations
+            numeric_col = f"{col}_numeric"
+            
+            # Convert to string and standardize
+            df_encoded[col] = df_encoded[col].astype(str).str.upper().str.strip()
+            
+            # Initialize numeric column with float dtype from the start
+            df_encoded[numeric_col] = -1.0  # This creates a float column
+            
+            valid_mask = ~df_encoded[col].isin(['UNKNOWN', 'UUU', 'NAN', 'NONE', ''])
+            
+            if valid_mask.any():
+                valid_codes = df_encoded.loc[valid_mask, col]
+                numeric_values = []
+                
+                for code in valid_codes:
+                    # Remove dots and dashes
+                    clean_code = code.replace('.', '').replace('-', '')
+                    
+                    if not clean_code:
+                        numeric_values.append(-1.0)
+                        continue
+                    
+                    # For ICD-10 codes (starting with letter)
+                    if clean_code[0].isalpha():
+                        # Get letter chapter (A=1, B=2, etc.)
+                        chapter = ord(clean_code[0]) - ord('A') + 1
+                        
+                        # Extract only digits from the rest of the code
+                        digits = ''.join(c for c in clean_code[1:] if c.isdigit())
+                        decimal_part = float('0.' + digits) if digits else 0.0
+                        
+                        # Combine
+                        numeric_values.append(float(chapter + decimal_part))
+                    
+                    # For procedure codes (starting with digit)
+                    elif clean_code[0].isdigit():
+                        # Extract only digits from the entire code
+                        digits = ''.join(c for c in clean_code if c.isdigit())
+                        
+                        if digits:
+                            # First digit is chapter, rest becomes decimal
+                            chapter = int(digits[0])
+                            decimal_part = float('0.' + digits[1:]) if len(digits) > 1 else 0.0
+                            numeric_values.append(float(chapter + decimal_part))
+                        else:
+                            numeric_values.append(-1.0)
+                    
+                    else:
+                        numeric_values.append(-1.0)
+                
+                # Explicitly convert to numpy array of float type before assignment
+                import numpy as np
+                numeric_array = np.array(numeric_values, dtype=float)
+                df_encoded.loc[valid_mask, numeric_col] = numeric_array
+        
+        return df_encoded
+    
+    def get_sensitive_attributes_columns(all_columns, table_name):
+        """
+        Get columns containing sensitive attributes based on the table type.
+        
+        Args:
+            all_columns: List of all column names available in the datasets
+            table_name: Name of the table (used to determine which sensitive attributes to include)
+            
+        Returns:
+            List of column names that match the sensitive attributes
+        """
+        # Define sensitive attributes based on table type
+        if 'inpatient' in table_name.lower():
+            sensitive_attributes = [
+                'year_of_birth',
+                'gender',
+                'diagnosis_diagnosis',
+                'procedure_code',
+                'regional_code',
+                'date_of_admission', 
+                'date_of_discharge'
+                # 'department_admission',
+                # 'department_discharge',
+                # 'cause_of_admission'
+            ]
+        elif 'outpatient' in table_name.lower():
+            sensitive_attributes = [
+                'year_of_birth',
+                'gender',
+                'diagnosis_diagnosis',
+                'procedure_code',
+                'regional_code',
+                'practice_code',
+                'from',  # outpatient_cases_from
+                'to',    # outpatient_cases_to
+                'year',
+                'quarter'
+            ]
+        elif 'drugs' in table_name.lower():
+            sensitive_attributes = [
+                'year_of_birth',
+                'gender',
+                'regional_code',
+                'date_of_prescription',
+                'date_of_dispense',
+                'pharma_central_number',
+                'specialty_of_prescriber',
+                'atc'
+            ]
+        
+        # Get columns that contain any of the sensitive attribute substrings
+        filtered_cols = []
+        for column in all_columns:
+            if any(attr in column.lower() for attr in sensitive_attributes):
+                filtered_cols.append(column)
+        
+        if not filtered_cols:
+            raise ValueError(f"No matching sensitive attributes found for table: {table_name}")
+        
+        print(f"Selected {len(filtered_cols)} sensitive columns for {table_name}")
+        print(f"Columns: {', '.join(filtered_cols)}")
+        
+        return filtered_cols
 
-        # Process each dataframe separately
-        df1, numeric1 = self.convert_timestamps_to_epoch(df1, timestamp_cols, numeric1)
-        df2, numeric2 = self.convert_timestamps_to_epoch(df2, timestamp_cols, numeric2)
-        
-        # Standardize numeric columns (intersection of numeric columns in both DataFrames)
-        numeric_cols = list(set(numeric1).intersection(set(numeric2)))
-        for col in numeric_cols:
-            df1[col] = pd.to_numeric(df1[col], errors='coerce')
-            df2[col] = pd.to_numeric(df2[col], errors='coerce')
 
-        
-        # All non-numeric columns are treated as strings
-        string_cols = list(set(df1.columns).difference(set(numeric_cols)))
-        for col in string_cols:
-            df1[col] = df1[col].astype(str)
-            df2[col] = df2[col].astype(str)
-        
-        return df1, df2, numeric_cols, string_cols
-        
-    def calculate_metrics(self, db1_path, db2_path, table_name, sample_size=10000):
+    def calculate_metrics(self, db1_path, db2_path, table_name, sample_size=10000, use_pca=True, pca_variance=0.95):
         """
         Calculate privacy metrics (DCR and NNDR) between original and synthetic datasets.
         
@@ -278,6 +339,8 @@ class PrivacyMetricsCalculator:
             db2_path: Path to the synthetic DuckDB database
             table_name: Name of the table to compare
             sample_size: Maximum number of records to use for the comparison
+            use_pca: Whether to use PCA for dimensionality reduction
+            pca_variance: Variance threshold for PCA (default: 0.95)
         
         Returns:
             Dictionary containing the privacy metrics
@@ -303,10 +366,20 @@ class PrivacyMetricsCalculator:
         common_cols = list(set(original_data.columns).intersection(set(synthetic_data.columns)))
         if len(common_cols) == 0:
             logging.error("No common columns found between datasets")
-            return {"error": "No common columns found between datasets"}
+            raise ValueError("No common columns found between datasets")
         
-        original_data = original_data[common_cols]
-        synthetic_data = synthetic_data[common_cols]
+        # Remove 'pid' and any columns containing 'caseID'
+        # filtered_cols = [col for col in common_cols if col != 'pid' and 'caseID' not in col]
+        # if len(filtered_cols) == 0:
+            # logging.error("No common columns remain after filtering out pid and caseID columns")
+            # raise ValueError("No common columns remain after filtering")
+        # logging.info(f"Removed {len(common_cols) - len(filtered_cols)} columns containing 'pid' or 'caseID'")
+        # logging.info(f"Proceeding with {len(filtered_cols)} common columns")
+
+        all_columns = original_data.columns.tolist()
+        filtered_cols = self.get_sensitive_attributes_columns(all_columns, table_name)
+        original_data = original_data[filtered_cols]
+        synthetic_data = synthetic_data[filtered_cols]
         
         # Sample the data to make computation feasible
         no_of_records = min(original_data.shape[0], synthetic_data.shape[0], sample_size)
@@ -316,20 +389,51 @@ class PrivacyMetricsCalculator:
         original_sample = original_data.sample(n=no_of_records, random_state=42).reset_index(drop=True)
         synthetic_sample = synthetic_data.sample(n=no_of_records, random_state=42).reset_index(drop=True)
         
-        # Standardize column types
-        original_sample, synthetic_sample, numeric_cols, string_cols = self.standardize_column_types(
-            original_sample, synthetic_sample
+        # Determine column types
+        original_sample, synthetic_sample, numeric_cols, string_cols = self.preprocess_dataframes(
+            original_data, synthetic_sample
         )
         
-        logging.info(f"After standardization - Numeric columns: {len(numeric_cols)}")
-        logging.info(f"After standardization - String columns: {len(string_cols)}")
+        logging.info(f"After split - Numeric columns: {len(numeric_cols)}")
+        logging.info(f"After split - String columns: {len(string_cols)}")
+        
+        # if use_pca:
+        #     try:               
+        #         # Run PCA to understand important features
+        #         logging.info("Running PCA analysis to identify important features...")
+        #         pca_results = analyze_principal_components(
+        #             df=original_sample[numeric_cols],
+        #             exclude_cols=[],  # Already filtered columns
+        #             variance_threshold=pca_variance,
+        #             display_plots=True,  # Set to True for debugging
+        #             output_dir='pca_results_for_metrics'
+        #         )
+                
+        #         # Log the most important features
+        #         top_features = pca_results['feature_importance'].head(10)
+        #         logging.info("Top 10 most important features:")
+        #         for idx, row in top_features.iterrows():
+        #             logging.info(f"  {idx}: {row['RelativeImportance']:.2f}% importance")
+                
+        #         # Get the reduced data
+        #         original_sample = pca_results['reduced_data'].iloc[:no_of_records]
+        #         synthetic_sample = pca_results['reduced_data'].iloc[no_of_records:]
+                
+        #         # Update column information after PCA
+        #         numeric_cols = original_sample.columns.tolist()
+        #         string_cols = []  # PCA output is all numeric
+                
+        #         logging.info(f"After PCA: Reduced from {len(filtered_cols)} to {len(numeric_cols)} dimensions")
+        #         logging.info(f"Retained {pca_results['explained_variance'].sum()*100:.2f}% of variance")
+                
+        #     except Exception as e:
+        #         logging.error(f"Error during PCA analysis: {str(e)}")
+        #         logging.info("Continuing with original features (PCA disabled)")
         
         # Create transformer for feature encoding
         transformers = []
         if len(numeric_cols) > 0:
-            transformers.append((SimpleImputer(missing_values=np.nan, strategy="mean"), numeric_cols))
-        if len(string_cols) > 0:
-            transformers.append((OneHotEncoder(handle_unknown='ignore'), string_cols))
+            transformers.append((SimpleImputer(missing_values=np.nan, strategy="constant", fill_value= -1.0), numeric_cols))
             
         if not transformers:
             logging.error("No valid columns for transformation")
@@ -480,6 +584,7 @@ class PrivacyMetricsCalculator:
 
     # [keep other methods unchanged]
 
+
 def main():
     parser = argparse.ArgumentParser(description='Calculate privacy metrics between original and synthetic datasets')
     parser.add_argument('--original', required=True, help='Path to original DuckDB database')
@@ -499,13 +604,13 @@ def main():
         return
     
     # Create calculator and calculate metrics
-    calculator = PrivacyMetricsCalculator(results_dir=args.results_dir)
+    calculator = DistanceMetricsCalculator(results_dir=args.results_dir)
     
     results = calculator.calculate_metrics(
         args.original, 
         args.synthetic, 
         args.table,
-        args.sample_size
+        args.sample_size,
     )
     
     if "error" in results:
@@ -538,16 +643,16 @@ def main():
     print("\nPrivacy Assessment:")
     print("-" * 70)
     if results['dcr']['synthetic_to_original_p5'] < results['dcr']['within_original_p5']:
-        print("⚠️  PRIVACY RISK: DCR of synthetic to original is lower than within-original distance")
+        print("PRIVACY RISK: DCR of synthetic to original is lower than within-original distance")
         print("    This suggests synthetic records may be too similar to specific original records")
     else:
-        print("✅ DCR check passed: Synthetic records maintain safe distance from original records")
+        print("DCR check passed: Synthetic records maintain safe distance from original records")
         
     if results['nndr']['synthetic_to_original_p5'] < results['nndr']['within_original_p5']:
-        print("⚠️  PRIVACY RISK: NNDR of synthetic to original is lower than within-original NNDR")
+        print("PRIVACY RISK: NNDR of synthetic to original is lower than within-original NNDR")
         print("    This suggests synthetic records may uniquely identify specific original records")
     else:
-        print("✅ NNDR check passed: Synthetic records don't uniquely identify specific original records")
+        print("NNDR check passed: Synthetic records don't uniquely identify specific original records")
     print("-" * 70)
 
 if __name__ == "__main__":

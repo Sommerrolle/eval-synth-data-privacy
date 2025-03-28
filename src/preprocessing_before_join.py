@@ -210,54 +210,54 @@ class HealthClaimsPreprocessor:
         except Exception as e:
             logging.error(f"Error creating preprocessed table: {str(e)}")
             
-            # Try fallback approach with column-by-column updates
-            try:
-                logging.info(f"Attempting fallback approach for {table_name}")
-                return self._preprocess_table_fallback(table_name, columns_info)
-            except Exception as fallback_e:
-                logging.error(f"Fallback approach also failed: {str(fallback_e)}")
-                return None
+            # # Try fallback approach with column-by-column updates
+            # try:
+            #     logging.info(f"Attempting fallback approach for {table_name}")
+            #     return self._preprocess_table_fallback(table_name, columns_info)
+            # except Exception as fallback_e:
+            #     logging.error(f"Fallback approach also failed: {str(fallback_e)}")
+            #     return None
     
-    def _preprocess_table_fallback(self, table_name: str, columns_info: List[Dict]) -> str:
-        """
-        Fallback approach for preprocessing: copy table first, then update columns one by one.
+    # def _preprocess_table_fallback(self, table_name: str, columns_info: List[Dict]) -> str:
+    #     """
+    #     Fallback approach for preprocessing: copy table first, then update columns one by one.
         
-        Args:
-            table_name: Name of the table to preprocess
-            columns_info: Column information for the table
+    #     Args:
+    #         table_name: Name of the table to preprocess
+    #         columns_info: Column information for the table
             
-        Returns:
-            Name of the preprocessed table
-        """
-        output_table = f"{self.output_prefix}{table_name}"
+    #     Returns:
+    #         Name of the preprocessed table
+    #     """
+    #     output_table = f"{self.output_prefix}{table_name}"
         
-        # Copy table structure and data
-        self.db_manager.execute_query(self.db_path, f"DROP TABLE IF EXISTS {output_table}")
-        self.db_manager.execute_query(self.db_path, f"CREATE TABLE {output_table} AS SELECT * FROM {table_name}")
+    #     # Copy table structure and data
+    #     self.db_manager.execute_query(self.db_path, f"DROP TABLE IF EXISTS {output_table}")
+    #     self.db_manager.execute_query(self.db_path, f"CREATE TABLE {output_table} AS SELECT * FROM {table_name}")
         
-        # Update each column one by one
-        for col_info in columns_info:
-            col_name = col_info['name']
-            col_type = col_info['type']
+    #     # Update each column one by one
+    #     for col_info in columns_info:
+    #         col_name = col_info['name']
+    #         col_type = col_info['type']
             
-            # Skip columns with no nulls
-            null_count = self.db_manager.execute_query(
-                self.db_path, 
-                f"SELECT COUNT(*) FROM {output_table} WHERE {col_name} IS NULL"
-            )
+    #         # Skip columns with no nulls
+    #         null_count = self.db_manager.execute_query(
+    #             self.db_path, 
+    #             f"SELECT COUNT(*) FROM {output_table} WHERE {col_name} IS NULL"
+    #         )
             
-            if null_count and null_count[0][0] > 0:
-                # Get imputation value based on column and table type
-                imputation_expr = self._get_imputation_value(table_name, col_name, col_type)
+    #         if null_count and null_count[0][0] > 0:
+    #             # Get imputation value based on column and table type
+    #             imputation_expr = self._get_imputation_value(table_name, col_name, col_type)
                 
-                # Update the column
-                update_sql = f"UPDATE {output_table} SET {col_name} = {imputation_expr} WHERE {col_name} IS NULL"
-                self.db_manager.execute_query(self.db_path, update_sql)
+    #             # Update the column
+    #             update_sql = f"UPDATE {output_table} SET {col_name} = {imputation_expr} WHERE {col_name} IS NULL"
+    #             self.db_manager.execute_query(self.db_path, update_sql)
         
-        # Verify no nulls remain
-        self._verify_no_nulls(output_table, [col['name'] for col in columns_info])
+    #     # Verify no nulls remain
+    #     self._verify_no_nulls(output_table, [col['name'] for col in columns_info])
         
-        return output_table
+    #     return output_table
     
     def _generate_imputation_sql(self, table_name: str, columns_info: List[Dict]) -> str:
         """
@@ -307,49 +307,49 @@ class HealthClaimsPreprocessor:
         # Construct the full SELECT statement
         return f"SELECT {', '.join(column_expressions)} FROM {table_name}"
     
-    def _get_imputation_value(self, table_name: str, col_name: str, col_type: str) -> str:
-        """
-        Get the appropriate imputation value for a column in fallback mode.
+    # def _get_imputation_value(self, table_name: str, col_name: str, col_type: str) -> str:
+    #     """
+    #     Get the appropriate imputation value for a column in fallback mode.
         
-        Args:
-            table_name: Name of the table
-            col_name: Name of the column
-            col_type: Type of the column
+    #     Args:
+    #         table_name: Name of the table
+    #         col_name: Name of the column
+    #         col_type: Type of the column
             
-        Returns:
-            SQL expression for the imputation value
-        """
-        col_type_upper = col_type.upper()
+    #     Returns:
+    #         SQL expression for the imputation value
+    #     """
+    #     col_type_upper = col_type.upper()
         
-        # Handle different data types with appropriate defaults
-        if 'INT' in col_type_upper or 'BIGINT' in col_type_upper:
-            return "0"
-        elif 'DOUBLE' in col_type_upper or 'FLOAT' in col_type_upper:
-            return "0.0"
-        elif 'DATE' in col_type_upper or 'TIMESTAMP' in col_type_upper:
-            return "'2510-01-01'"
-        elif 'VARCHAR' in col_type_upper or 'CHAR' in col_type_upper or 'TEXT' in col_type_upper:
-            # Special handling for specific columns
-            if 'diagnosis' in col_name.lower():
-                return "'UNKNOWN'"
-            elif 'procedure_code' in col_name.lower():
-                return "'UNKNOWN'"
-            elif 'pharma_central_number' in col_name.lower():
-                return "'00000000'"
-            elif any(code in col_name.lower() for code in ['physician_code', 'physican_code', 'practice_code']):
-                return "'000000000'"
-            elif 'specialty' in col_name.lower():
-                return "'00'"
-            elif 'department' in col_name.lower():
-                return "'0000'"
-            else:
-                return "'UNKNOWN'"
-        else:
-            return "NULL"  # Fallback, shouldn't be reached if verify_no_nulls is working
+    #     # Handle different data types with appropriate defaults
+    #     if 'INT' in col_type_upper or 'BIGINT' in col_type_upper:
+    #         return "0"
+    #     elif 'DOUBLE' in col_type_upper or 'FLOAT' in col_type_upper:
+    #         return "0.0"
+    #     elif 'DATE' in col_type_upper or 'TIMESTAMP' in col_type_upper:
+    #         return "'2510-01-01'"
+    #     elif 'VARCHAR' in col_type_upper or 'CHAR' in col_type_upper or 'TEXT' in col_type_upper:
+    #         # Special handling for specific columns
+    #         if 'diagnosis' in col_name.lower():
+    #             return "'UNKNOWN'"
+    #         elif 'procedure_code' in col_name.lower():
+    #             return "'UNKNOWN'"
+    #         elif 'pharma_central_number' in col_name.lower():
+    #             return "'00000000'"
+    #         elif any(code in col_name.lower() for code in ['physician_code', 'physican_code', 'practice_code']):
+    #             return "'000000000'"
+    #         elif 'specialty' in col_name.lower():
+    #             return "'00'"
+    #         elif 'department' in col_name.lower():
+    #             return "'0000'"
+    #         else:
+    #             return "'UNKNOWN'"
+    #     else:
+    #         return "NULL"  # Fallback, shouldn't be reached if verify_no_nulls is working
     
-    #
-    # Table-specific imputation methods
-    #
+    # #
+    # # Table-specific imputation methods
+    # #
     
     def _impute_insurants_column(self, col_name: str, col_type: str) -> str:
         """Generate imputation for insurants table columns."""
