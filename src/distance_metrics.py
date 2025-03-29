@@ -2,7 +2,8 @@ import numpy as np
 import pandas as pd
 from sklearn.compose import make_column_transformer
 from sklearn.neighbors import NearestNeighbors
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.pipeline import make_pipeline
 from sklearn.impute import SimpleImputer
 import logging
 import argparse
@@ -10,6 +11,8 @@ import os
 import json
 from datetime import datetime
 from pathlib import Path
+import matplotlib.pyplot as plt
+import numpy as np
 
 # Import your duckdb_manager
 from duckdb_manager import DuckDBManager
@@ -265,7 +268,7 @@ class DistanceMetricsCalculator:
         
         return df_encoded
     
-    def get_sensitive_attributes_columns(all_columns, table_name):
+    def get_sensitive_attributes_columns(self, all_columns, table_name):
         """
         Get columns containing sensitive attributes based on the table type.
         
@@ -391,8 +394,26 @@ class DistanceMetricsCalculator:
         
         # Determine column types
         original_sample, synthetic_sample, numeric_cols, string_cols = self.preprocess_dataframes(
-            original_data, synthetic_sample
+            original_sample, synthetic_sample
         )
+
+        # Check for duplicates in original data
+        original_duplicates = original_sample.duplicated().sum()
+        logging.info(f"Duplicates in original data: {original_duplicates}")
+
+        # Check for duplicates in synthetic data
+        synthetic_duplicates = synthetic_sample.duplicated().sum()
+        logging.info(f"Duplicates in synthetic data: {synthetic_duplicates}")
+
+        # Remove duplicates from both datasets before encoding
+        original_sample_dedup = original_sample.drop_duplicates().reset_index(drop=True)
+        synthetic_sample_dedup = synthetic_sample.drop_duplicates().reset_index(drop=True)
+
+        logging.info(f"Original data: {len(original_sample)} records, {len(original_sample_dedup)} after deduplication")
+        logging.info(f"Synthetic data: {len(synthetic_sample)} records, {len(synthetic_sample_dedup)} after deduplication")
+
+        # Continue with your pipeline using the deduplicated datasets
+        combined_df = pd.concat([original_sample_dedup, synthetic_sample_dedup], axis=0)
         
         logging.info(f"After split - Numeric columns: {len(numeric_cols)}")
         logging.info(f"After split - String columns: {len(string_cols)}")
@@ -433,11 +454,17 @@ class DistanceMetricsCalculator:
         # Create transformer for feature encoding
         transformers = []
         if len(numeric_cols) > 0:
-            transformers.append((SimpleImputer(missing_values=np.nan, strategy="constant", fill_value= -1.0), numeric_cols))
+            transformers.append((
+                make_pipeline(
+                    SimpleImputer(missing_values=np.nan, strategy="mean"),
+                    StandardScaler()
+                ), 
+                numeric_cols
+            ))
             
         if not transformers:
             logging.error("No valid columns for transformation")
-            return {"error": "No valid columns for transformation"}
+            raise ValueError("No valid columns for transformation")
             
         transformer = make_column_transformer(
             *transformers,
@@ -445,109 +472,140 @@ class DistanceMetricsCalculator:
         )
         
         # Fit and transform the data
-        combined_df = pd.concat([original_sample, synthetic_sample], axis=0)
         logging.info(f"Fitting transformer on combined data of shape {combined_df.shape}")
         
         try:
             transformer.fit(combined_df)
             
-            original_encoded = transformer.transform(original_sample)
-            synthetic_encoded = transformer.transform(synthetic_sample)
+            original_encoded = transformer.transform(original_sample_dedup)
+            synthetic_encoded = transformer.transform(synthetic_sample_dedup)
             
             # Check for sparse matrices and convert to dense if needed
-            if hasattr(original_encoded, 'toarray'):
-                original_encoded = original_encoded.toarray()
-            if hasattr(synthetic_encoded, 'toarray'):
-                synthetic_encoded = synthetic_encoded.toarray()
+            # if hasattr(original_encoded, 'toarray'):
+            #     original_encoded = original_encoded.toarray()
+            # if hasattr(synthetic_encoded, 'toarray'):
+            #     synthetic_encoded = synthetic_encoded.toarray()
                 
             logging.info(f"Transformed data shapes - Original: {original_encoded.shape}, Synthetic: {synthetic_encoded.shape}")
         except Exception as e:
             logging.error(f"Error during data transformation: {str(e)}")
             return {"error": f"Transformation error: {str(e)}"}
         
+        # Add these diagnostic checks
+        print(f"Original encoded shape: {original_encoded.shape}")
+        print(f"Synthetic encoded shape: {synthetic_encoded.shape}")
+        print(f"Original encoded sample:\n{original_encoded[:3]}")  # Show first 3 rows
+        print(f"Synthetic encoded sample:\n{synthetic_encoded[:3]}")  # Show first 3 rows
+        print(f"Original encoded has NaNs: {np.isnan(original_encoded).any()}")
+        print(f"Synthetic encoded has NaNs: {np.isnan(synthetic_encoded).any()}")
+        
         # Calculate distances between original and synthetic data
         logging.info("Calculating nearest neighbors...")
         try:
             # Calculate DCR from synthetic to original
-            nn_synthetic_to_original = NearestNeighbors(n_neighbors=2, algorithm="brute", metric="l2", n_jobs=-1)
+            nn_synthetic_to_original = NearestNeighbors(n_neighbors=2, algorithm="kd_tree", metric="l2", n_jobs=-1)
             nn_synthetic_to_original.fit(original_encoded)
             distances_syn_to_orig, _ = nn_synthetic_to_original.kneighbors(synthetic_encoded)
             
-            # Calculate DCR from original to synthetic
-            nn_original_to_synthetic = NearestNeighbors(n_neighbors=2, algorithm="brute", metric="l2", n_jobs=-1)
-            nn_original_to_synthetic.fit(synthetic_encoded)
-            distances_orig_to_syn, _ = nn_original_to_synthetic.kneighbors(original_encoded)
+            # Calculate DCR from original to synthetic, useful for utility
+            # Does my synthetic data represent all types of records from the original data?"
+            # nn_original_to_synthetic = NearestNeighbors(n_neighbors=2, algorithm="brute", metric="l2", n_jobs=-1)
+            # nn_original_to_synthetic.fit(synthetic_encoded)
+            # distances_orig_to_syn, _ = nn_original_to_synthetic.kneighbors(original_encoded)
             
             # Calculate within-dataset distances for original data
-            nn_original_within = NearestNeighbors(n_neighbors=2, algorithm="brute", metric="l2", n_jobs=-1)
+            nn_original_within = NearestNeighbors(n_neighbors=3, algorithm="kd_tree", metric="l2", n_jobs=-1)
             nn_original_within.fit(original_encoded)
             distances_orig_within, _ = nn_original_within.kneighbors(original_encoded)
             
             # Calculate within-dataset distances for synthetic data
-            nn_synthetic_within = NearestNeighbors(n_neighbors=2, algorithm="brute", metric="l2", n_jobs=-1)
-            nn_synthetic_within.fit(synthetic_encoded)
-            distances_syn_within, _ = nn_synthetic_within.kneighbors(synthetic_encoded)
+            # nn_synthetic_within = NearestNeighbors(n_neighbors=2, algorithm="brute", metric="l2", n_jobs=-1)
+            # nn_synthetic_within.fit(synthetic_encoded)
+            # distances_syn_within, _ = nn_synthetic_within.kneighbors(synthetic_encoded)
+
+            # After fitting nearest neighbors
+            print(f"Number of neighbors found (synthetic to original): {distances_syn_to_orig.shape}")
+            print(f"First few distances: {distances_syn_to_orig[:5]}")
+
+            # For within-original distances
+            print(f"Number of neighbors found (within original): {distances_orig_within.shape}")
+            print(f"First few distances: {distances_orig_within[:5]}")
             
         except Exception as e:
             logging.error(f"Error during nearest neighbor calculation: {str(e)}")
             return {"error": f"Nearest neighbor calculation error: {str(e)}"}
-        
+                
         # Calculate DCR (Distance to Closest Record)
         # For DCR, we use the first column which is the distance to the nearest neighbor
         dcr_syn_to_orig = distances_syn_to_orig[:, 0]
-        dcr_orig_to_syn = distances_orig_to_syn[:, 0]
+        # dcr_orig_to_syn = distances_orig_to_syn[:, 0]
         dcr_orig_within = distances_orig_within[:, 1]  # Use second column as first is distance to self (zero)
-        dcr_syn_within = distances_syn_within[:, 1]    # Use second column as first is distance to self (zero)
+        # dcr_syn_within = distances_syn_within[:, 1]    # Use second column as first is distance to self (zero)
         
         # Calculate NNDR (Nearest Neighbor Distance Ratio)
         # For NNDR, we use the ratio of distances to the first and second nearest neighbors
         nndr_syn_to_orig = distances_syn_to_orig[:, 0] / np.maximum(distances_syn_to_orig[:, 1], 1e-8)
-        nndr_orig_to_syn = distances_orig_to_syn[:, 0] / np.maximum(distances_orig_to_syn[:, 1], 1e-8)
+        # nndr_orig_to_syn = distances_orig_to_syn[:, 0] / np.maximum(distances_orig_to_syn[:, 1], 1e-8)
         
         # Calculate within-dataset NNDR - use 2nd and 3rd neighbors since 1st is self
         if distances_orig_within.shape[1] > 2:
             nndr_orig_within = distances_orig_within[:, 1] / np.maximum(distances_orig_within[:, 2], 1e-8)
-            nndr_syn_within = distances_syn_within[:, 1] / np.maximum(distances_syn_within[:, 2], 1e-8)
+            # nndr_syn_within = distances_syn_within[:, 1] / np.maximum(distances_syn_within[:, 2], 1e-8)
         else:
-            # If we only have 2 neighbors, use a placeholder value
-            nndr_orig_within = np.ones(len(distances_orig_within)) * 0.5
-            nndr_syn_within = np.ones(len(distances_syn_within)) * 0.5
+            logging.error(f"Error during NNDR calculation: {str(e)}")
+            return ValueError(f"NNDR calculation error: {str(e)}")
         
         # Get the 5th percentile metrics
         dcr_syn_to_orig_p5 = np.percentile(dcr_syn_to_orig, 5)
-        dcr_orig_to_syn_p5 = np.percentile(dcr_orig_to_syn, 5)
+        # dcr_orig_to_syn_p5 = np.percentile(dcr_orig_to_syn, 5)
         dcr_orig_within_p5 = np.percentile(dcr_orig_within, 5)
-        dcr_syn_within_p5 = np.percentile(dcr_syn_within, 5)
+        # dcr_syn_within_p5 = np.percentile(dcr_syn_within, 5)
         
         nndr_syn_to_orig_p5 = np.percentile(nndr_syn_to_orig, 5)
-        nndr_orig_to_syn_p5 = np.percentile(nndr_orig_to_syn, 5)
+        # nndr_orig_to_syn_p5 = np.percentile(nndr_orig_to_syn, 5)
         nndr_orig_within_p5 = np.percentile(nndr_orig_within, 5)
-        nndr_syn_within_p5 = np.percentile(nndr_syn_within, 5)
+        # nndr_syn_within_p5 = np.percentile(nndr_syn_within, 5)
+        
+        # Check distribution of distances
+        print(f"DCR within original - min: {dcr_orig_within.min()}, max: {dcr_orig_within.max()}, mean: {dcr_orig_within.mean()}")
+
+        # # Histogram of distances might also be informative
+        # import matplotlib.pyplot as plt
+        # plt.figure(figsize=(10, 6))
+        # plt.hist(dcr_syn_to_orig, bins=50, alpha=0.5, label='Synthetic to Original')
+        # plt.hist(dcr_orig_within, bins=50, alpha=0.5, label='Within Original')
+        # plt.legend()
+        # plt.title('Distribution of Distances')
+        # plt.savefig('distance_distribution.png')
+
+        # Generate visualization
+        plot_file = self.plot_distance_distribution(dcr_syn_to_orig, dcr_orig_within)
+        logging.info(f"Distance distribution visualization saved to: {plot_file}")
         
         # Log detailed results
         logging.info(f"DCR 5th percentile (synthetic to original): {dcr_syn_to_orig_p5:.4f}")
-        logging.info(f"DCR 5th percentile (original to synthetic): {dcr_orig_to_syn_p5:.4f}")
+        # logging.info(f"DCR 5th percentile (original to synthetic): {dcr_orig_to_syn_p5:.4f}")
         logging.info(f"DCR 5th percentile (within original): {dcr_orig_within_p5:.4f}")
-        logging.info(f"DCR 5th percentile (within synthetic): {dcr_syn_within_p5:.4f}")
+        # logging.info(f"DCR 5th percentile (within synthetic): {dcr_syn_within_p5:.4f}")
         
         logging.info(f"NNDR 5th percentile (synthetic to original): {nndr_syn_to_orig_p5:.4f}")
-        logging.info(f"NNDR 5th percentile (original to synthetic): {nndr_orig_to_syn_p5:.4f}")
+        # logging.info(f"NNDR 5th percentile (original to synthetic): {nndr_orig_to_syn_p5:.4f}")
         logging.info(f"NNDR 5th percentile (within original): {nndr_orig_within_p5:.4f}")
-        logging.info(f"NNDR 5th percentile (within synthetic): {nndr_syn_within_p5:.4f}")
+        # logging.info(f"NNDR 5th percentile (within synthetic): {nndr_syn_within_p5:.4f}")
         
         # Prepare results dictionary
         results = {
             "dcr": {
                 "synthetic_to_original_p5": float(dcr_syn_to_orig_p5),
-                "original_to_synthetic_p5": float(dcr_orig_to_syn_p5),
+                # "original_to_synthetic_p5": float(dcr_orig_to_syn_p5),
                 "within_original_p5": float(dcr_orig_within_p5),
-                "within_synthetic_p5": float(dcr_syn_within_p5)
+                # "within_synthetic_p5": float(dcr_syn_within_p5)
             },
             "nndr": {
                 "synthetic_to_original_p5": float(nndr_syn_to_orig_p5),
-                "original_to_synthetic_p5": float(nndr_orig_to_syn_p5),
+                # "original_to_synthetic_p5": float(nndr_orig_to_syn_p5),
                 "within_original_p5": float(nndr_orig_within_p5),
-                "within_synthetic_p5": float(nndr_syn_within_p5)
+                # "within_synthetic_p5": float(nndr_syn_within_p5)
             }
         }
         
@@ -558,6 +616,61 @@ class DistanceMetricsCalculator:
             logging.warning("Privacy risk: NNDR of synthetic to original is lower than within-original NNDR")
         
         return results
+    
+    def plot_distance_distribution(self, dcr_syn_to_orig, dcr_orig_within, output_file='distance_distribution.png'):
+        """
+        Create a visualization of distance distributions with regular and log scales,
+        highlighting the 5th percentile.
+        
+        Args:
+            dcr_syn_to_orig: Array of synthetic-to-original distances
+            dcr_orig_within: Array of within-original distances
+            output_file: Path to save the visualization (default: 'distance_distribution.png')
+        """
+        import matplotlib.pyplot as plt
+        import numpy as np
+        
+        # Create a figure with two subplots
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+        
+        # First subplot: Regular scale focusing on 0-0.5 range
+        ax1.hist(dcr_syn_to_orig, bins=50, alpha=0.5, label='Synthetic to Original', range=(0, 0.5))
+        ax1.hist(dcr_orig_within, bins=50, alpha=0.5, label='Within Original', range=(0, 0.5))
+        ax1.legend()
+        ax1.set_title('Distribution of Distances (0-0.5 range)')
+        ax1.set_xlabel('Distance')
+        ax1.set_ylabel('Frequency')
+        
+        # Second subplot: Log scale for better visualization of small values
+        ax2.hist(dcr_syn_to_orig, bins=50, alpha=0.5, label='Synthetic to Original')
+        ax2.hist(dcr_orig_within, bins=50, alpha=0.5, label='Within Original')
+        ax2.set_xscale('log')  # Use logarithmic scale for x-axis
+        ax2.legend()
+        ax2.set_title('Distribution of Distances (Log Scale)')
+        ax2.set_xlabel('Distance (log scale)')
+        ax2.set_ylabel('Frequency')
+        
+        # Add percentile markers
+        for ax in [ax1, ax2]:
+            # 5th percentiles
+            syn_orig_p5 = np.percentile(dcr_syn_to_orig, 5)
+            orig_within_p5 = np.percentile(dcr_orig_within, 5)
+            
+            ax.axvline(x=syn_orig_p5, color='blue', linestyle='--', 
+                    label=f'5th percentile (Syn→Orig): {syn_orig_p5:.6f}')
+            ax.axvline(x=orig_within_p5, color='orange', linestyle='--', 
+                    label=f'5th percentile (Within Orig): {orig_within_p5:.6f}')
+            
+            # Update legend to include the percentile lines
+            handles, labels = ax.get_legend_handles_labels()
+            ax.legend(handles[:2] + handles[2:], labels[:2] + labels[2:], loc='best')
+        
+        plt.tight_layout()
+        plt.savefig(output_file, dpi=300)
+        plt.close()
+        
+        return output_file
+
     
     def save_results(self, results, db1_name, db2_name, table_name):
         """
@@ -581,8 +694,6 @@ class DistanceMetricsCalculator:
         
         logging.info(f"Results saved to: {filepath}")
         return filepath
-
-    # [keep other methods unchanged]
 
 
 def main():
@@ -626,16 +737,16 @@ def main():
     print("\nPrivacy Metrics Results:")
     print("-" * 70)
     print("Distance to Closest Record (DCR) - 5th percentile:")
-    print(f"  Synthetic → Original: {results['dcr']['synthetic_to_original_p5']:.4f}")
-    print(f"  Original → Synthetic: {results['dcr']['original_to_synthetic_p5']:.4f}")
-    print(f"  Within Original:      {results['dcr']['within_original_p5']:.4f}")
-    print(f"  Within Synthetic:     {results['dcr']['within_synthetic_p5']:.4f}")
+    print(f"  Synthetic → Original: {results['dcr']['synthetic_to_original_p5']:.10f}")
+    # print(f"  Original → Synthetic: {results['dcr']['original_to_synthetic_p5']:.4f}")
+    print(f"  Within Original:      {results['dcr']['within_original_p5']:.10f}")
+    # print(f"  Within Synthetic:     {results['dcr']['within_synthetic_p5']:.4f}")
     print("-" * 70)
     print("Nearest Neighbor Distance Ratio (NNDR) - 5th percentile:")
-    print(f"  Synthetic → Original: {results['nndr']['synthetic_to_original_p5']:.4f}")
-    print(f"  Original → Synthetic: {results['nndr']['original_to_synthetic_p5']:.4f}")
-    print(f"  Within Original:      {results['nndr']['within_original_p5']:.4f}")
-    print(f"  Within Synthetic:     {results['nndr']['within_synthetic_p5']:.4f}")
+    print(f"  Synthetic → Original: {results['nndr']['synthetic_to_original_p5']:.10f}")
+    # print(f"  Original → Synthetic: {results['nndr']['original_to_synthetic_p5']:.4f}")
+    print(f"  Within Original:      {results['nndr']['within_original_p5']:.10f}")
+    # print(f"  Within Synthetic:     {results['nndr']['within_synthetic_p5']:.4f}")
     print("-" * 70)
     print(f"Results saved to: {output_file}")
     
