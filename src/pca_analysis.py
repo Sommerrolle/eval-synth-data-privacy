@@ -266,3 +266,37 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
+# use pca in distance metrics script
+        # if use_pca:
+        #     try:               
+        #         # Run PCA to understand important features
+        #         logging.info("Running PCA analysis to identify important features...")
+        #         pca_results = analyze_principal_components(
+        #             df=original_sample[numeric_cols],
+        #             exclude_cols=[],  # Already filtered columns
+        #             variance_threshold=pca_variance,
+        #             display_plots=True,  # Set to True for debugging
+        #             output_dir='pca_results_for_metrics'
+        #         )
+                
+        #         # Log the most important features
+        #         top_features = pca_results['feature_importance'].head(10)
+        #         logging.info("Top 10 most important features:")
+        #         for idx, row in top_features.iterrows():
+        #             logging.info(f"  {idx}: {row['RelativeImportance']:.2f}% importance")
+                
+        #         # Get the reduced data
+        #         original_sample = pca_results['reduced_data'].iloc[:no_of_records]
+        #         synthetic_sample = pca_results['reduced_data'].iloc[no_of_records:]
+                
+        #         # Update column information after PCA
+        #         numeric_cols = original_sample.columns.tolist()
+        #         string_cols = []  # PCA output is all numeric
+                
+        #         logging.info(f"After PCA: Reduced from {len(filtered_cols)} to {len(numeric_cols)} dimensions")
+        #         logging.info(f"Retained {pca_results['explained_variance'].sum()*100:.2f}% of variance")
+                
+        #     except Exception as e:
+        #         logging.error(f"Error during PCA analysis: {str(e)}")
+        #         logging.info("Continuing with original features (PCA disabled)")

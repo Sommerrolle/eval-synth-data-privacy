@@ -363,19 +363,14 @@ class DistanceMetricsCalculator:
         filtered_cols = self.get_sensitive_attributes_columns(all_columns, table_name)
         original_data = original_data[filtered_cols]
         synthetic_data = synthetic_data[filtered_cols]
-        
+
         # Sample the data to make computation feasible
         no_of_records = min(original_data.shape[0], synthetic_data.shape[0], sample_size)
         logging.info(f"Using {no_of_records} records for privacy metric calculations")
-        
+
         # Sample from original and synthetic data
         original_sample = original_data.sample(n=no_of_records, random_state=42).reset_index(drop=True)
         synthetic_sample = synthetic_data.sample(n=no_of_records, random_state=42).reset_index(drop=True)
-        
-        # Determine column types
-        original_sample, synthetic_sample, numeric_cols, string_cols = self.preprocess_dataframes(
-            original_sample, synthetic_sample
-        )
 
         # Check for duplicates in original data
         original_duplicates = original_sample.duplicated().sum()
@@ -385,16 +380,20 @@ class DistanceMetricsCalculator:
         synthetic_duplicates = synthetic_sample.duplicated().sum()
         logging.info(f"Duplicates in synthetic data: {synthetic_duplicates}")
 
-        # Remove duplicates from both datasets before encoding
-        original_sample_dedup = original_sample.drop_duplicates().reset_index(drop=True)
-        synthetic_sample_dedup = synthetic_sample.drop_duplicates().reset_index(drop=True)
+        # Remove duplicates from both datasets before preprocessing
+        original_sample = original_sample.drop_duplicates().reset_index(drop=True)
+        synthetic_sample = synthetic_sample.drop_duplicates().reset_index(drop=True)
+        logging.info(f"Original data: {no_of_records} records, {len(original_sample)} after deduplication")
+        logging.info(f"Synthetic data: {no_of_records} records, {len(synthetic_sample)} after deduplication")
 
-        logging.info(f"Original data: {len(original_sample)} records, {len(original_sample_dedup)} after deduplication")
-        logging.info(f"Synthetic data: {len(synthetic_sample)} records, {len(synthetic_sample_dedup)} after deduplication")
+        # Determine column types
+        original_sample, synthetic_sample, numeric_cols, string_cols = self.preprocess_dataframes(
+            original_sample, synthetic_sample
+        )
 
         # Continue with your pipeline using the deduplicated datasets
-        combined_df = pd.concat([original_sample_dedup, synthetic_sample_dedup], axis=0)
-        
+        combined_df = pd.concat([original_sample, synthetic_sample], axis=0)
+
         logging.info(f"After split - Numeric columns: {len(numeric_cols)}")
         logging.info(f"After split - String columns: {len(string_cols)}")
                
@@ -424,8 +423,8 @@ class DistanceMetricsCalculator:
         try:
             transformer.fit(combined_df)
             
-            original_encoded = transformer.transform(original_sample_dedup)
-            synthetic_encoded = transformer.transform(synthetic_sample_dedup)
+            original_encoded = transformer.transform(original_sample)
+            synthetic_encoded = transformer.transform(synthetic_sample)
                 
             logging.info(f"Transformed data shapes - Original: {original_encoded.shape}, Synthetic: {synthetic_encoded.shape}")
         except Exception as e:
