@@ -84,18 +84,6 @@ class DistanceMetricsCalculator:
             # Update common_cols after medical code conversion (original cols removed, new numeric cols added)
             common_cols = list(set(df1.columns).intersection(set(df2.columns)))
         
-        # # 3. Verify and convert timestamp columns
-        # timestamp_cols = []
-        # for col in potential_timestamp_cols:
-        #     if col in common_cols:  # Check if column still exists after medical code processing
-        #         try:
-        #             # Test if column can be converted to datetime
-        #             pd.to_datetime(df1[col].head(100), errors='raise')
-        #             pd.to_datetime(df2[col].head(100), errors='raise')
-        #             timestamp_cols.append(col)
-        #         except:
-        #             pass  # Not a timestamp column
-        
         # Initialize numeric_cols list
         numeric_cols = []
         
@@ -370,14 +358,6 @@ class DistanceMetricsCalculator:
         if len(common_cols) == 0:
             logging.error("No common columns found between datasets")
             raise ValueError("No common columns found between datasets")
-        
-        # Remove 'pid' and any columns containing 'caseID'
-        # filtered_cols = [col for col in common_cols if col != 'pid' and 'caseID' not in col]
-        # if len(filtered_cols) == 0:
-            # logging.error("No common columns remain after filtering out pid and caseID columns")
-            # raise ValueError("No common columns remain after filtering")
-        # logging.info(f"Removed {len(common_cols) - len(filtered_cols)} columns containing 'pid' or 'caseID'")
-        # logging.info(f"Proceeding with {len(filtered_cols)} common columns")
 
         all_columns = original_data.columns.tolist()
         filtered_cols = self.get_sensitive_attributes_columns(all_columns, table_name)
@@ -417,40 +397,7 @@ class DistanceMetricsCalculator:
         
         logging.info(f"After split - Numeric columns: {len(numeric_cols)}")
         logging.info(f"After split - String columns: {len(string_cols)}")
-        
-        # if use_pca:
-        #     try:               
-        #         # Run PCA to understand important features
-        #         logging.info("Running PCA analysis to identify important features...")
-        #         pca_results = analyze_principal_components(
-        #             df=original_sample[numeric_cols],
-        #             exclude_cols=[],  # Already filtered columns
-        #             variance_threshold=pca_variance,
-        #             display_plots=True,  # Set to True for debugging
-        #             output_dir='pca_results_for_metrics'
-        #         )
-                
-        #         # Log the most important features
-        #         top_features = pca_results['feature_importance'].head(10)
-        #         logging.info("Top 10 most important features:")
-        #         for idx, row in top_features.iterrows():
-        #             logging.info(f"  {idx}: {row['RelativeImportance']:.2f}% importance")
-                
-        #         # Get the reduced data
-        #         original_sample = pca_results['reduced_data'].iloc[:no_of_records]
-        #         synthetic_sample = pca_results['reduced_data'].iloc[no_of_records:]
-                
-        #         # Update column information after PCA
-        #         numeric_cols = original_sample.columns.tolist()
-        #         string_cols = []  # PCA output is all numeric
-                
-        #         logging.info(f"After PCA: Reduced from {len(filtered_cols)} to {len(numeric_cols)} dimensions")
-        #         logging.info(f"Retained {pca_results['explained_variance'].sum()*100:.2f}% of variance")
-                
-        #     except Exception as e:
-        #         logging.error(f"Error during PCA analysis: {str(e)}")
-        #         logging.info("Continuing with original features (PCA disabled)")
-        
+               
         # Create transformer for feature encoding
         transformers = []
         if len(numeric_cols) > 0:
@@ -479,12 +426,6 @@ class DistanceMetricsCalculator:
             
             original_encoded = transformer.transform(original_sample_dedup)
             synthetic_encoded = transformer.transform(synthetic_sample_dedup)
-            
-            # Check for sparse matrices and convert to dense if needed
-            # if hasattr(original_encoded, 'toarray'):
-            #     original_encoded = original_encoded.toarray()
-            # if hasattr(synthetic_encoded, 'toarray'):
-            #     synthetic_encoded = synthetic_encoded.toarray()
                 
             logging.info(f"Transformed data shapes - Original: {original_encoded.shape}, Synthetic: {synthetic_encoded.shape}")
         except Exception as e:
@@ -568,15 +509,6 @@ class DistanceMetricsCalculator:
         
         # Check distribution of distances
         print(f"DCR within original - min: {dcr_orig_within.min()}, max: {dcr_orig_within.max()}, mean: {dcr_orig_within.mean()}")
-
-        # # Histogram of distances might also be informative
-        # import matplotlib.pyplot as plt
-        # plt.figure(figsize=(10, 6))
-        # plt.hist(dcr_syn_to_orig, bins=50, alpha=0.5, label='Synthetic to Original')
-        # plt.hist(dcr_orig_within, bins=50, alpha=0.5, label='Within Original')
-        # plt.legend()
-        # plt.title('Distribution of Distances')
-        # plt.savefig('distance_distribution.png')
 
         # Generate visualization
         plot_file = self.plot_distance_distribution(dcr_syn_to_orig, dcr_orig_within)
