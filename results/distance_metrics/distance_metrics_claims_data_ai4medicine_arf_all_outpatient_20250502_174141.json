@@ -1,0 +1,10 @@
+{
+  "dcr": {
+    "synthetic_to_original_p5": 0.08512310091327834,
+    "within_original_p5": 0.00033083765608921123
+  },
+  "nndr": {
+    "synthetic_to_original_p5": 0.6639462046825396,
+    "within_original_p5": 0.01551937992316516
+  }
+}
