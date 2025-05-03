@@ -16,6 +16,8 @@ import numpy as np
 
 # Import your duckdb_manager
 from duckdb_manager import DuckDBManager
+# Import the feature preprocessing module
+from feature_preprocessing import FeaturePreprocessor
 from pca_analysis import analyze_principal_components
 
 logging.basicConfig(
@@ -30,231 +32,231 @@ logging.basicConfig(
 class DistanceMetricsCalculator:
     """Calculate privacy metrics between original and synthetic datasets."""
     
-    def __init__(self, results_dir='results/privacy_metrics'):
+    def __init__(self, results_dir='results/distance_metrics'):
         """Initialize the PrivacyMetricsCalculator."""
         self.results_dir = results_dir
         os.makedirs(results_dir, exist_ok=True)
         self.db_manager = DuckDBManager()
     
     
-    def preprocess_dataframes(self, df1, df2):
-        """
-        Preprocess two dataframes to standardize column types and handle special columns.
+    # def preprocess_dataframes(self, df1, df2):
+    #     """
+    #     Preprocess two dataframes to standardize column types and handle special columns.
         
-        Args:
-            df1: First DataFrame
-            df2: Second DataFrame
+    #     Args:
+    #         df1: First DataFrame
+    #         df2: Second DataFrame
             
-        Returns:
-            Tuple of (df1, df2, numeric_cols, string_cols) with standardized types
-        """
-        # Get common columns
-        common_cols = list(set(df1.columns).intersection(set(df2.columns)))
-        df1 = df1[common_cols].copy()
-        df2 = df2[common_cols].copy()
+    #     Returns:
+    #         Tuple of (df1, df2, numeric_cols, string_cols) with standardized types
+    #     """
+    #     # Get common columns
+    #     common_cols = list(set(df1.columns).intersection(set(df2.columns)))
+    #     df1 = df1[common_cols].copy()
+    #     df2 = df2[common_cols].copy()
         
-        logging.info(f"Preprocessing {len(common_cols)} common columns")
+    #     logging.info(f"Preprocessing {len(common_cols)} common columns")
         
-        # 1. First, identify special column types for preprocessing
-        diagnosis_cols = [col for col in common_cols if "diagnosis_diagnosis" in col.lower()]
-        procedure_cols = [col for col in common_cols if "procedure_code" in col.lower()]
+    #     # 1. First, identify special column types for preprocessing
+    #     diagnosis_cols = [col for col in common_cols if "diagnosis_diagnosis" in col.lower()]
+    #     procedure_cols = [col for col in common_cols if "procedure_code" in col.lower()]
         
-        # Identify potential timestamp columns (we'll convert these later)
-        timestamp_cols = []
-        for col in common_cols:
-            col_lower = col.lower()
-            if any(term in col_lower for term in ["date", "time", "from", "to"]):
-                timestamp_cols.append(col)
+    #     # Identify potential timestamp columns (we'll convert these later)
+    #     timestamp_cols = []
+    #     for col in common_cols:
+    #         col_lower = col.lower()
+    #         if any(term in col_lower for term in ["date", "time", "from", "to"]):
+    #             timestamp_cols.append(col)
         
-        # 2. Convert medical codes (both diagnosis and procedure) to numerical values
-        all_medical_code_cols = []
-        if diagnosis_cols:
-            logging.info(f"Converting {len(diagnosis_cols)} diagnosis columns to numerical values")
-            all_medical_code_cols.extend(diagnosis_cols)
+    #     # 2. Convert medical codes (both diagnosis and procedure) to numerical values
+    #     all_medical_code_cols = []
+    #     if diagnosis_cols:
+    #         logging.info(f"Converting {len(diagnosis_cols)} diagnosis columns to numerical values")
+    #         all_medical_code_cols.extend(diagnosis_cols)
 
-        if procedure_cols:
-            logging.info(f"Converting {len(procedure_cols)} procedure columns to numerical values")
-            all_medical_code_cols.extend(procedure_cols)
+    #     if procedure_cols:
+    #         logging.info(f"Converting {len(procedure_cols)} procedure columns to numerical values")
+    #         all_medical_code_cols.extend(procedure_cols)
 
-        if all_medical_code_cols:
-            logging.info(f"Using simplified encoding for {len(all_medical_code_cols)} medical code columns")
-            df1 = self.encode_medical_codes(df1, all_medical_code_cols)
-            df2 = self.encode_medical_codes(df2, all_medical_code_cols)
+    #     if all_medical_code_cols:
+    #         logging.info(f"Using simplified encoding for {len(all_medical_code_cols)} medical code columns")
+    #         df1 = self.encode_medical_codes(df1, all_medical_code_cols)
+    #         df2 = self.encode_medical_codes(df2, all_medical_code_cols)
             
-            # Update common_cols after medical code conversion (original cols removed, new numeric cols added)
-            common_cols = list(set(df1.columns).intersection(set(df2.columns)))
+    #         # Update common_cols after medical code conversion (original cols removed, new numeric cols added)
+    #         common_cols = list(set(df1.columns).intersection(set(df2.columns)))
         
-        # Initialize numeric_cols list
-        numeric_cols = []
+    #     # Initialize numeric_cols list
+    #     numeric_cols = []
         
-        # 4. Convert timestamp columns to Unix timestamps
-        if timestamp_cols:
-            logging.info(f"Converting {len(timestamp_cols)} timestamp columns to Unix timestamps")
-            df1, numeric_cols = self.convert_timestamps_to_epoch(df1, timestamp_cols, numeric_cols)
-            df2, numeric_cols = self.convert_timestamps_to_epoch(df2, timestamp_cols, numeric_cols)
+    #     # 4. Convert timestamp columns to Unix timestamps
+    #     if timestamp_cols:
+    #         logging.info(f"Converting {len(timestamp_cols)} timestamp columns to Unix timestamps")
+    #         df1, numeric_cols = self.convert_timestamps_to_epoch(df1, timestamp_cols, numeric_cols)
+    #         df2, numeric_cols = self.convert_timestamps_to_epoch(df2, timestamp_cols, numeric_cols)
         
-        # 5. Now categorize remaining columns as numeric or string
-        remaining_cols = [col for col in common_cols if col not in timestamp_cols]
-        remaining_numeric, string_cols = self.categorize_columns(df1, df2, remaining_cols)
+    #     # 5. Now categorize remaining columns as numeric or string
+    #     remaining_cols = [col for col in common_cols if col not in timestamp_cols]
+    #     remaining_numeric, string_cols = self.categorize_columns(df1, df2, remaining_cols)
 
-        # Remove medical code cols from string cols
-        string_cols = [col for col in string_cols if col not in all_medical_code_cols]
+    #     # Remove medical code cols from string cols
+    #     string_cols = [col for col in string_cols if col not in all_medical_code_cols]
         
-        # Add remaining numeric columns to our numeric_cols list
-        numeric_cols.extend(remaining_numeric)
+    #     # Add remaining numeric columns to our numeric_cols list
+    #     numeric_cols.extend(remaining_numeric)
         
-        # 6. Standardize the data types
-        for col in numeric_cols:
-            if col in df1.columns and col in df2.columns:  # Verify column exists
-                df1[col] = pd.to_numeric(df1[col], errors='coerce')
-                df2[col] = pd.to_numeric(df2[col], errors='coerce')
+    #     # 6. Standardize the data types
+    #     for col in numeric_cols:
+    #         if col in df1.columns and col in df2.columns:  # Verify column exists
+    #             df1[col] = pd.to_numeric(df1[col], errors='coerce')
+    #             df2[col] = pd.to_numeric(df2[col], errors='coerce')
         
-        for col in string_cols:
-            if col in df1.columns and col in df2.columns:  # Verify column exists
-                df1[col] = df1[col].astype(str)
-                df2[col] = df2[col].astype(str)
+    #     for col in string_cols:
+    #         if col in df1.columns and col in df2.columns:  # Verify column exists
+    #             df1[col] = df1[col].astype(str)
+    #             df2[col] = df2[col].astype(str)
         
-        return df1, df2, numeric_cols, string_cols
+    #     return df1, df2, numeric_cols, string_cols
     
-    def convert_timestamps_to_epoch(self, df, timestamp_cols, numeric_cols):
-        """
-        Convert timestamp columns to Unix epoch time (seconds since 1970-01-01).
+    # def convert_timestamps_to_epoch(self, df, timestamp_cols, numeric_cols):
+    #     """
+    #     Convert timestamp columns to Unix epoch time (seconds since 1970-01-01).
         
-        Args:
-            df: DataFrame to process
-            timestamp_cols: List of column names containing timestamp data
-            numeric_cols: List of numeric column names for the dataframe
+    #     Args:
+    #         df: DataFrame to process
+    #         timestamp_cols: List of column names containing timestamp data
+    #         numeric_cols: List of numeric column names for the dataframe
             
-        Returns:
-            Tuple containing (df, updated_numeric_cols) with updated values
-        """
-        for col in timestamp_cols:
-            if col in df.columns:
-                try:
-                    df[col] = pd.to_datetime(df[col], errors='coerce')
-                    # Log problematic values
-                    if df[col].isna().any():
-                        problematic_values = df.loc[df[col].isna(), col].head(5).tolist()
-                        logging.warning(f"Column '{col}' has {df[col].isna().sum()} values that couldn't be converted to datetime. Examples: {problematic_values}")
-                        if problematic_values:
-                            logging.warning(f"  Problem examples: {problematic_values}")
-                    # Convert to Unix timestamp (seconds since epoch)
-                    df[col] = df[col].apply(lambda x: x.timestamp() if pd.notna(x) else np.nan)
-                except Exception as e:
-                    logging.error(f"Failed to convert column '{col}' to timestamp: {str(e)}")
-                    # Force numeric conversion, set unconvertible values to NaN
-                    df[col] = pd.to_numeric(df[col], errors='coerce')
+    #     Returns:
+    #         Tuple containing (df, updated_numeric_cols) with updated values
+    #     """
+    #     for col in timestamp_cols:
+    #         if col in df.columns:
+    #             try:
+    #                 df[col] = pd.to_datetime(df[col], errors='coerce')
+    #                 # Log problematic values
+    #                 if df[col].isna().any():
+    #                     problematic_values = df.loc[df[col].isna(), col].head(5).tolist()
+    #                     logging.warning(f"Column '{col}' has {df[col].isna().sum()} values that couldn't be converted to datetime. Examples: {problematic_values}")
+    #                     if problematic_values:
+    #                         logging.warning(f"  Problem examples: {problematic_values}")
+    #                 # Convert to Unix timestamp (seconds since epoch)
+    #                 df[col] = df[col].apply(lambda x: x.timestamp() if pd.notna(x) else np.nan)
+    #             except Exception as e:
+    #                 logging.error(f"Failed to convert column '{col}' to timestamp: {str(e)}")
+    #                 # Force numeric conversion, set unconvertible values to NaN
+    #                 df[col] = pd.to_numeric(df[col], errors='coerce')
                 
-                # Add to numeric columns
-                if col not in numeric_cols:
-                    numeric_cols.append(col)
+    #             # Add to numeric columns
+    #             if col not in numeric_cols:
+    #                 numeric_cols.append(col)
         
-        return df, numeric_cols
+    #     return df, numeric_cols
 
-    def categorize_columns(self, df1, df2, common_cols):
-        """
-        Categorize columns as numeric or string based on their content.
+    # def categorize_columns(self, df1, df2, common_cols):
+    #     """
+    #     Categorize columns as numeric or string based on their content.
         
-        Args:
-            df1: First DataFrame
-            df2: Second DataFrame
-            common_cols: List of common column names
+    #     Args:
+    #         df1: First DataFrame
+    #         df2: Second DataFrame
+    #         common_cols: List of common column names
             
-        Returns:
-            Tuple of (numeric_cols, string_cols)
-        """
-        numeric_cols = []
-        string_cols = []
+    #     Returns:
+    #         Tuple of (numeric_cols, string_cols)
+    #     """
+    #     numeric_cols = []
+    #     string_cols = []
         
-        for col in common_cols:
-            # Try to convert to numeric
-            try:
-                test1 = pd.to_numeric(df1[col].dropna().head(100), errors='raise')
-                test2 = pd.to_numeric(df2[col].dropna().head(100), errors='raise')
-                # If both convert successfully, it's a numeric column
-                numeric_cols.append(col)
-            except:
-                # Otherwise, treat as string
-                string_cols.append(col)
+    #     for col in common_cols:
+    #         # Try to convert to numeric
+    #         try:
+    #             test1 = pd.to_numeric(df1[col].dropna().head(100), errors='raise')
+    #             test2 = pd.to_numeric(df2[col].dropna().head(100), errors='raise')
+    #             # If both convert successfully, it's a numeric column
+    #             numeric_cols.append(col)
+    #         except:
+    #             # Otherwise, treat as string
+    #             string_cols.append(col)
         
-        logging.info(f"Categorized columns: {len(numeric_cols)} numeric, {len(string_cols)} string")
-        return numeric_cols, string_cols
+    #     logging.info(f"Categorized columns: {len(numeric_cols)} numeric, {len(string_cols)} string")
+    #     return numeric_cols, string_cols
 
-    def encode_medical_codes(self, df, code_columns):
-        """
-        Simplified encoding of medical codes by removing non-numeric characters,
-        except for the initial letter in ICD codes.
+    # def encode_medical_codes(self, df, code_columns):
+    #     """
+    #     Simplified encoding of medical codes by removing non-numeric characters,
+    #     except for the initial letter in ICD codes.
         
-        Args:
-            df: DataFrame containing medical codes
-            code_columns: List of code columns to encode
+    #     Args:
+    #         df: DataFrame containing medical codes
+    #         code_columns: List of code columns to encode
             
-        Returns:
-            DataFrame with encoded medical codes
-        """
-        df_encoded = df.copy()
+    #     Returns:
+    #         DataFrame with encoded medical codes
+    #     """
+    #     df_encoded = df.copy()
         
-        for col in code_columns:
-            if col not in df.columns:
-                continue
+    #     for col in code_columns:
+    #         if col not in df.columns:
+    #             continue
                 
-            # Create a new column for numeric representations
-            numeric_col = f"{col}_numeric"
+    #         # Create a new column for numeric representations
+    #         numeric_col = f"{col}_numeric"
             
-            # Convert to string and standardize
-            df_encoded[col] = df_encoded[col].astype(str).str.upper().str.strip()
+    #         # Convert to string and standardize
+    #         df_encoded[col] = df_encoded[col].astype(str).str.upper().str.strip()
             
-            # Initialize numeric column with float dtype from the start
-            df_encoded[numeric_col] = -1.0  # This creates a float column
+    #         # Initialize numeric column with float dtype from the start
+    #         df_encoded[numeric_col] = -1.0  # This creates a float column
             
-            valid_mask = ~df_encoded[col].isin(['UNKNOWN', 'UUU', 'NAN', 'NONE', ''])
+    #         valid_mask = ~df_encoded[col].isin(['UNKNOWN', 'UUU', 'NAN', 'NONE', ''])
             
-            if valid_mask.any():
-                valid_codes = df_encoded.loc[valid_mask, col]
-                numeric_values = []
+    #         if valid_mask.any():
+    #             valid_codes = df_encoded.loc[valid_mask, col]
+    #             numeric_values = []
                 
-                for code in valid_codes:
-                    # Remove dots and dashes
-                    clean_code = code.replace('.', '').replace('-', '')
+    #             for code in valid_codes:
+    #                 # Remove dots and dashes
+    #                 clean_code = code.replace('.', '').replace('-', '')
                     
-                    if not clean_code:
-                        numeric_values.append(-1.0)
-                        continue
+    #                 if not clean_code:
+    #                     numeric_values.append(-1.0)
+    #                     continue
                     
-                    # For ICD-10 codes (starting with letter)
-                    if clean_code[0].isalpha():
-                        # Get letter chapter (A=1, B=2, etc.)
-                        chapter = ord(clean_code[0]) - ord('A') + 1
+    #                 # For ICD-10 codes (starting with letter)
+    #                 if clean_code[0].isalpha():
+    #                     # Get letter chapter (A=1, B=2, etc.)
+    #                     chapter = ord(clean_code[0]) - ord('A') + 1
                         
-                        # Extract only digits from the rest of the code
-                        digits = ''.join(c for c in clean_code[1:] if c.isdigit())
-                        decimal_part = float('0.' + digits) if digits else 0.0
+    #                     # Extract only digits from the rest of the code
+    #                     digits = ''.join(c for c in clean_code[1:] if c.isdigit())
+    #                     decimal_part = float('0.' + digits) if digits else 0.0
                         
-                        # Combine
-                        numeric_values.append(float(chapter + decimal_part))
+    #                     # Combine
+    #                     numeric_values.append(float(chapter + decimal_part))
                     
-                    # For procedure codes (starting with digit)
-                    elif clean_code[0].isdigit():
-                        # Extract only digits from the entire code
-                        digits = ''.join(c for c in clean_code if c.isdigit())
+    #                 # For procedure codes (starting with digit)
+    #                 elif clean_code[0].isdigit():
+    #                     # Extract only digits from the entire code
+    #                     digits = ''.join(c for c in clean_code if c.isdigit())
                         
-                        if digits:
-                            # First digit is chapter, rest becomes decimal
-                            chapter = int(digits[0])
-                            decimal_part = float('0.' + digits[1:]) if len(digits) > 1 else 0.0
-                            numeric_values.append(float(chapter + decimal_part))
-                        else:
-                            numeric_values.append(-1.0)
+    #                     if digits:
+    #                         # First digit is chapter, rest becomes decimal
+    #                         chapter = int(digits[0])
+    #                         decimal_part = float('0.' + digits[1:]) if len(digits) > 1 else 0.0
+    #                         numeric_values.append(float(chapter + decimal_part))
+    #                     else:
+    #                         numeric_values.append(-1.0)
                     
-                    else:
-                        numeric_values.append(-1.0)
+    #                 else:
+    #                     numeric_values.append(-1.0)
                 
-                # Explicitly convert to numpy array of float type before assignment
-                import numpy as np
-                numeric_array = np.array(numeric_values, dtype=float)
-                df_encoded.loc[valid_mask, numeric_col] = numeric_array
+    #             # Explicitly convert to numpy array of float type before assignment
+    #             import numpy as np
+    #             numeric_array = np.array(numeric_values, dtype=float)
+    #             df_encoded.loc[valid_mask, numeric_col] = numeric_array
         
-        return df_encoded
+    #     return df_encoded
     
     def get_sensitive_attributes_columns(self, all_columns, table_name):
         """
@@ -336,7 +338,7 @@ class DistanceMetricsCalculator:
         Returns:
             Dictionary containing the privacy metrics
         """
-        logging.info(f"Calculating privacy metrics for table: {table_name}")
+        logging.info(f"Calculating  metrics for table: {table_name}")
         logging.info(f"Original DB: {db1_path}, Synthetic DB: {db2_path}")
         
         # Get data from DuckDB databases using your manager
@@ -386,8 +388,8 @@ class DistanceMetricsCalculator:
         logging.info(f"Original data: {no_of_records} records, {len(original_sample)} after deduplication")
         logging.info(f"Synthetic data: {no_of_records} records, {len(synthetic_sample)} after deduplication")
 
-        # Determine column types
-        original_sample, synthetic_sample, numeric_cols, string_cols = self.preprocess_dataframes(
+        # Determine column types - now using the FeaturePreprocessor
+        original_sample, synthetic_sample, numeric_cols, string_cols = FeaturePreprocessor.preprocess_dataframes(
             original_sample, synthetic_sample
         )
 
@@ -617,7 +619,7 @@ class DistanceMetricsCalculator:
         db1_stem = Path(db1_name).stem if db1_name.endswith('.duckdb') else db1_name
         db2_stem = Path(db2_name).stem if db2_name.endswith('.duckdb') else db2_name
         
-        filename = f"privacy_metrics_{db1_stem}_{db2_stem}_{table_name}_{timestamp}.json"
+        filename = f"distance_metrics_{db1_stem}_{db2_stem}_{table_name}_{timestamp}.json"
         filepath = os.path.join(self.results_dir, filename)
         
         with open(filepath, 'w') as f:
@@ -633,7 +635,7 @@ def main():
     parser.add_argument('--synthetic', required=True, help='Path to synthetic DuckDB database')
     parser.add_argument('--table', required=True, help='Table name to compare')
     parser.add_argument('--sample_size', type=int, default=10000, help='Maximum number of records to use')
-    parser.add_argument('--results_dir', default='results/privacy_metrics', help='Directory to save results')
+    parser.add_argument('--results_dir', default='results/distance_metrics', help='Directory to save results')
     
     args = parser.parse_args()
     
