@@ -10,6 +10,8 @@ from sklearn.preprocessing import LabelEncoder
 import time
 import logging
 from duckdb_manager import DuckDBManager
+from feature_preprocessing import preprocess_single_dataframe
+
 
 # Configure logging
 logging.basicConfig(
@@ -37,7 +39,7 @@ class NpEncoder(json.JSONEncoder):
 class PrivacyMetricsCalculator:
     """Calculate privacy metrics for synthetic health claims data"""
     
-    def __init__(self, results_dir: str = 'results/privacy_calculator', qi_inpatient=None, qi_outpatient=None, sensitive_attributes=None):
+    def __init__(self, results_dir: str = 'results/privacy_calculator', qi_inpatient=None, qi_outpatient=None, qi_drugs=None, sensitive_attributes=None):
         """
         Initialize the PrivacyMetricsCalculator with the specified parameters.
         
@@ -52,6 +54,7 @@ class PrivacyMetricsCalculator:
         self.selected_metrics = self.get_privacy_metrics_selection()
         self.qi_inpatient = qi_inpatient or []
         self.qi_outpatient = qi_outpatient or []
+        self.qi_drugs = qi_drugs or []
         self.sensitive_attributes = sensitive_attributes or []
         self.db_manager = DuckDBManager()
         
@@ -128,10 +131,10 @@ class PrivacyMetricsCalculator:
         logging.info('Calculated l-diversity')
         return results
 
-    def calculate_t_closeness(self, df: pd.DataFrame, quasi_identifiers: List[str], 
+    def calculate_t_closeness(self, df: pd.DataFrame, quasi_identifiers: List[str],
                             sensitive_attributes: List[str], t_threshold: float = 0.15) -> Dict:
         """
-        Calculate t-closeness for the dataset.
+        Calculate t-closeness for the dataset using preprocessed features.
         
         Args:
             df: DataFrame containing the data
@@ -151,14 +154,30 @@ class PrivacyMetricsCalculator:
             if sensitive_attr not in df.columns:
                 continue
             
-            # Encode categorical sensitive attributes
-            encoder = LabelEncoder()
-            df[sensitive_attr] = encoder.fit_transform(df[sensitive_attr])
-
-            # Compute the global distribution of the sensitive attribute
-            global_dist = df[sensitive_attr].value_counts(normalize=True).sort_index()
+            # Create a copy of the dataframe with only the columns we need
+            columns_to_use = quasi_identifiers + [sensitive_attr]
+            df_subset = df[columns_to_use].copy()
             
-            groups = df.groupby(quasi_identifiers)
+            # Create a new dataframe with only the sensitive attribute for preprocessing
+            df_sensitive = df[[sensitive_attr]].copy()
+            
+            # Use the new preprocessing function instead of LabelEncoder
+            df_sensitive_processed = preprocess_single_dataframe(df_sensitive)
+            
+            # The processed column might have a different name if it's a medical code
+            # If it's a medical code, the preprocessor would add '_numeric' suffix
+            if f"{sensitive_attr}_numeric" in df_sensitive_processed.columns:
+                processed_attr_name = f"{sensitive_attr}_numeric"
+            else:
+                processed_attr_name = sensitive_attr
+            
+            # Replace the original column with the processed version
+            df_subset[sensitive_attr] = df_sensitive_processed[processed_attr_name]
+            
+            # Compute the global distribution of the sensitive attribute
+            global_dist = df_subset[sensitive_attr].value_counts(normalize=True).sort_index()
+            
+            groups = df_subset.groupby(quasi_identifiers)
             t_values = []
             
             for _, group in groups:
@@ -171,8 +190,8 @@ class PrivacyMetricsCalculator:
                 
                 # Compute Wasserstein Distance (EMD) using numerical values
                 emd = wasserstein_distance(
-                    all_values, all_values,  # Use the encoded numerical values
-                    u_weights=global_aligned.values, 
+                    all_values, all_values,  # Use the processed numerical values
+                    u_weights=global_aligned.values,
                     v_weights=group_aligned.values
                 )
                 t_values.append(emd)
@@ -183,7 +202,7 @@ class PrivacyMetricsCalculator:
                 "groups_violating_t": sum(1 for t in t_values if t > t_threshold),
                 "total_groups": len(t_values)
             }
-
+        
         logging.info('Calculated t-closeness')
         return results
 
@@ -245,57 +264,52 @@ class PrivacyMetricsCalculator:
             "privacy_score": float(privacy_score)
         }
 
-    def compare_tables(self, db1_path: str, db2_path: str, table_name: str) -> Dict:
+    def analyze_table(self, db_path: str, table_name: str) -> Dict:
         """
-        Compare privacy metrics between two versions of the same table in different databases.
+        Analyze privacy metrics for a specific table in a database.
         
         Args:
-            db1_path: Path to the first database
-            db2_path: Path to the second database
-            table_name: Name of the table to compare
+            db_path: Path to the database
+            table_name: Name of the table to analyze
             
         Returns:
-            Dictionary containing comparison results
+            Dictionary containing analysis results
         """
         # Use the DuckDBManager to load the data
-        df1 = self.db_manager.load_table_data(db1_path, table_name)
-        df2 = self.db_manager.load_table_data(db2_path, table_name)
+        df = self.db_manager.load_table_data(db_path, table_name)
         
-        if df1.empty or df2.empty:
+        if df.empty:
             logging.error(f"Failed to load data from {table_name}")
             return {"error": f"Failed to load data from {table_name}"}
         
         logging.info(f"Analyzing table: {table_name}")
         
         # Select appropriate quasi-identifiers based on table name
-        if '_4_5_6_7' in table_name:  # inpatient table
+        if 'inpatient' in table_name:  # inpatient table
             quasi_identifiers = self.qi_inpatient
-        elif '_8_9_10_11' in table_name:  # outpatient table
+        elif 'outpatient' in table_name:  # outpatient table
             quasi_identifiers = self.qi_outpatient
+        elif 'drugs' in table_name:  # drugs table
+            quasi_identifiers = self.qi_drugs
         else:
             raise ValueError(f"Unknown table type: {table_name}")
             
-        results1 = {}
-        results2 = {}
+        results = {}
         
         if 'k-anonymity' in self.selected_metrics:
-            results1.update(self.calculate_k_anonymity(df1, quasi_identifiers))
-            results2.update(self.calculate_k_anonymity(df2, quasi_identifiers))
+            results.update(self.calculate_k_anonymity(df, quasi_identifiers))
             
         if 'l-diversity' in self.selected_metrics:
-            results1['l_diversity'] = self.calculate_l_diversity(df1, quasi_identifiers, self.sensitive_attributes)
-            results2['l_diversity'] = self.calculate_l_diversity(df2, quasi_identifiers, self.sensitive_attributes)
+            results['l_diversity'] = self.calculate_l_diversity(df, quasi_identifiers, self.sensitive_attributes)
             
         if 't-closeness' in self.selected_metrics:
-            results1['t_closeness'] = self.calculate_t_closeness(df1, quasi_identifiers, self.sensitive_attributes)
-            results2['t_closeness'] = self.calculate_t_closeness(df2, quasi_identifiers, self.sensitive_attributes)
+            results['t_closeness'] = self.calculate_t_closeness(df, quasi_identifiers, self.sensitive_attributes)
         
         return {
             "table_name": table_name,
             "quasi_identifiers": quasi_identifiers,
             "sensitive_attributes": self.sensitive_attributes,
-            "dataset1_results": results1,
-            "dataset2_results": results2,
+            "results": results,
             "timestamp": datetime.now().isoformat()
         }
 
@@ -323,17 +337,16 @@ class PrivacyMetricsCalculator:
                 return [metrics[s] for s in selections]
             print("Invalid selection. Please try again.")
 
-    def save_results(self, results: Dict, db1_name: str, db2_name: str):
+    def save_results(self, results: Dict, db_name: str):
         """
-        Save comparison results to a JSON file.
+        Save analysis results to a JSON file.
         
         Args:
-            results: Dictionary containing comparison results
-            db1_name: Name of the first database
-            db2_name: Name of the second database
+            results: Dictionary containing analysis results
+            db_name: Name of the database
         """
         timestamp = datetime.now().strftime("%d%m%Y_%H%M%S")
-        filename = f"privacy_metrics_{db1_name}_{db2_name}_{timestamp}.json"
+        filename = f"privacy_metrics_{db_name}_{timestamp}.json"
         filepath = os.path.join(self.results_dir, filename)
         
         with open(filepath, 'w') as f:
@@ -345,12 +358,12 @@ class PrivacyMetricsCalculator:
             )
         logging.info(f"Results saved to: {filepath}")
 
-    def run_comparison(self):
-        """Run the comparison workflow with user interaction"""
+    def run_analysis(self):
+        """Run the analysis workflow with user interaction"""
         # Use the DuckDBManager to get the database list
         databases = self.db_manager.get_database_list()
-        if len(databases) < 2:
-            print("Need at least 2 databases to compare.")
+        if not databases:
+            print("No databases found in the directory.")
             return
         
         print("\nAvailable databases:")
@@ -359,43 +372,65 @@ class PrivacyMetricsCalculator:
         
         while True:
             try:
-                print("\nSelect two databases to compare (enter two numbers):")
-                db1_idx, db2_idx = map(int, input("> ").strip().split())
-                db1 = databases[db1_idx - 1]
-                db2 = databases[db2_idx - 1]
-                break
+                print("\nSelect a database to analyze (enter number):")
+                db_idx = int(input("> ").strip())
+                if 1 <= db_idx <= len(databases):
+                    selected_db = databases[db_idx - 1]
+                    break
+                print(f"Please enter a number between 1 and {len(databases)}")
             except (ValueError, IndexError):
-                print("Invalid selection. Please enter two valid numbers.")
+                print("Invalid selection. Please enter a valid number.")
         
-        db1_path = self.db_manager.get_database_path(db1)
-        db2_path = self.db_manager.get_database_path(db2)
+        db_path = self.db_manager.get_database_path(selected_db)
         
-        # Use the DuckDBManager to get common tables
-        common_tables = self.db_manager.get_common_tables(db1_path, db2_path)
-        if not common_tables:
-            print("No matching joined tables found between the databases.")
+        # Use the DuckDBManager to get tables
+        tables = self.db_manager.get_joined_tables(db_path)
+        if not tables:
+            print("No tables found in the database.")
             return
         
-        print("\nFound the following common tables:")
-        for i, table in enumerate(common_tables, 1):
-            table_count1 = self.db_manager.get_table_count(db1_path, table)
-            table_count2 = self.db_manager.get_table_count(db2_path, table)
-            print(f"{i}. {table} ({table_count1:,} rows vs {table_count2:,} rows)")
+        # Filter for relevant tables if desired
+        # For example, only comprehensive tables or tables matching certain patterns
+        # filtered_tables = [table for table in tables if "all" in table.lower()]
+        filtered_tables = tables
+        
+        if not filtered_tables:
+            print("No matching tables found in the database.")
+            return
+        
+        print("\nFound the following tables:")
+        for i, table in enumerate(filtered_tables, 1):
+            table_count = self.db_manager.get_table_count(db_path, table)
+            print(f"{i}. {table} ({table_count:,} rows)")
+        
+        while True:
+            try:
+                print("\nSelect tables to analyze (space-separated numbers, or 'all' for all tables):")
+                selection = input("> ").strip()
+                if selection.lower() == 'all':
+                    selected_tables = filtered_tables
+                    break
+                
+                table_indices = [int(idx) for idx in selection.split()]
+                if all(1 <= idx <= len(filtered_tables) for idx in table_indices):
+                    selected_tables = [filtered_tables[idx - 1] for idx in table_indices]
+                    break
+                print(f"Please enter numbers between 1 and {len(filtered_tables)}")
+            except (ValueError, IndexError):
+                print("Invalid selection. Please enter valid numbers or 'all'.")
             
         results = {
-            "database1": db1,
-            "database2": db2,
-            "comparisons": []
+            "database": selected_db,
+            "analyses": []
         }
         
-        for table in common_tables:
-            logging.info(f"Starting comparison for table: {table}")
-            comparison = self.compare_tables(db1_path, db2_path, table)
-            results["comparisons"].append(comparison)
+        for table in selected_tables:
+            logging.info(f"Starting analysis for table: {table}")
+            analysis = self.analyze_table(db_path, table)
+            results["analyses"].append(analysis)
         
-        db1_name = db1.replace('.duckdb', '')
-        db2_name = db2.replace('.duckdb', '')
-        self.save_results(results, db1_name, db2_name)
+        db_name = selected_db.replace('.duckdb', '')
+        self.save_results(results, db_name)
 
 
 def main():
@@ -404,6 +439,7 @@ def main():
     qi_inpatient = [
         "insurants_year_of_birth",
         "insurants_gender",
+        "insurance_data_regional_code",
         "inpatient_cases_date_of_admission",
         "inpatient_cases_department_admission"
     ]
@@ -411,26 +447,40 @@ def main():
     qi_outpatient = [
         "insurants_year_of_birth",
         "insurants_gender",
+        "insurance_data_regional_code",
         "outpatient_cases_from",
+        "outpatient_cases_to",
         "outpatient_cases_practice_code",
         "outpatient_cases_year",
         "outpatient_cases_quarter"
+    ]
+
+    qi_drugs = [
+        "insurants_year_of_birth",
+        "insurants_gender",
+        "insurance_data_regional_code",
+        "drugs_date_of_prescription",
+        "drugs_date_of_dispense"
     ]
     
     sensitive_attributes = [
         "inpatient_diagnosis_diagnosis",
         "inpatient_procedures_procedure_code",
         "outpatient_diagnosis_diagnosis",
-        "outpatient_procedures_procedure_code",    
+        "outpatient_procedures_procedure_code",
+        'drugs_pharma_central_number',
+        'drugs_specialty_of_prescriber',
+        'drugs_atc'   
     ]
     
     calculator = PrivacyMetricsCalculator(
         qi_inpatient=qi_inpatient,
         qi_outpatient=qi_outpatient,
+        qi_drugs=qi_drugs,
         sensitive_attributes=sensitive_attributes
     )
     
-    calculator.run_comparison()
+    calculator.run_analysis()
 
 if __name__ == "__main__":
     main()
