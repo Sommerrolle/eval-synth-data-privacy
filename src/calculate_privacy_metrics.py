@@ -39,7 +39,7 @@ class NpEncoder(json.JSONEncoder):
 class PrivacyMetricsCalculator:
     """Calculate privacy metrics for synthetic health claims data"""
     
-    def __init__(self, results_dir: str = 'results/privacy_calculator', qi_inpatient=None, qi_outpatient=None, qi_drugs=None, sensitive_attributes=None):
+    def __init__(self, results_dir: str = 'results/privacy_calculator', qi_inpatient=None, qi_outpatient=None, qi_drugs=None, sensitive_attributes=None, sample_size=5000000):
         """
         Initialize the PrivacyMetricsCalculator with the specified parameters.
         
@@ -48,6 +48,7 @@ class PrivacyMetricsCalculator:
             qi_inpatient: List of quasi-identifiers for inpatient data
             qi_outpatient: List of quasi-identifiers for outpatient data
             sensitive_attributes: List of sensitive attributes
+            sample_size: Maximum number of samples to use for calculations
         """
         self.results_dir = results_dir
         os.makedirs(results_dir, exist_ok=True)
@@ -57,6 +58,7 @@ class PrivacyMetricsCalculator:
         self.qi_drugs = qi_drugs or []
         self.sensitive_attributes = sensitive_attributes or []
         self.db_manager = DuckDBManager()
+        self.sample_size = self.get_sample_size_input(default=sample_size)
         
 
     def calculate_l_diversity(self, df: pd.DataFrame, quasi_identifiers: List[str], sensitive_attributes: List[str]) -> Dict:
@@ -263,6 +265,71 @@ class PrivacyMetricsCalculator:
             "total_records": len(df),
             "privacy_score": float(privacy_score)
         }
+    
+    # def sample_data_using_duckdb(self, db_path: str, table_name: str, sample_size: int) -> pd.DataFrame:
+    #     """
+    #     Sample data from a table using DuckDB's sampling capabilities.
+        
+    #     Args:
+    #         db_path: Path to the database
+    #         table_name: Name of the table to sample from
+    #         sample_size: Desired number of samples
+            
+    #     Returns:
+    #         DataFrame containing the sampled data
+    #     """
+    #     # Get the total row count first
+    #     total_count = self.db_manager.get_table_count(db_path, table_name)
+        
+    #     if sample_size >= total_count:
+    #         # If sample size is larger than or equal to total count, just load the entire table
+    #         df = self.db_manager.load_table_data(db_path, table_name)
+    #         logging.info(f"Loaded entire table with {len(df):,} rows")
+    #         return df
+        
+    #     # Try using TABLESAMPLE to get a random sample
+    #     sampling_percentage = (sample_size / total_count) * 100
+    #     query = f"SELECT * FROM {table_name} USING SAMPLE {sampling_percentage}% (reservoir)"
+        
+    #     try:
+    #         result = self.db_manager.execute_query(db_path, query)
+    #         df = pd.DataFrame(result)
+            
+    #         # Check if we got approximately the right number of rows
+    #         if len(df) < sample_size * 0.9:
+    #             logging.warning(f"Sample size too small: requested {sample_size}, got {len(df)}")
+                
+    #             # Try using ORDER BY RANDOM() LIMIT instead
+    #             query = f"SELECT * FROM {table_name} ORDER BY RANDOM() LIMIT {sample_size}"
+    #             result = self.db_manager.execute_query(db_path, query)
+    #             df = pd.DataFrame(result)
+    #             logging.info(f"Resampled to {len(df):,} rows using RANDOM() LIMIT")
+    #         elif len(df) > sample_size * 1.1:
+    #             logging.warning(f"Sample size too large: requested {sample_size}, got {len(df)}")
+    #             # If we got too many rows, subsample using pandas
+    #             df = df.sample(n=sample_size, random_state=42).reset_index(drop=True)
+    #             logging.info(f"Subsampled to {len(df):,} rows using pandas")
+                
+    #         # Check for duplicates
+    #         duplicates = df.duplicated().sum()
+    #         logging.info(f"Duplicates in sampled data: {duplicates:,}")
+            
+    #         return df
+        
+    #     except Exception as e:
+    #         logging.error(f"Error sampling data: {str(e)}")
+    #         # Fall back to loading the entire table and sampling with pandas
+    #         logging.info("Falling back to loading entire table and sampling with pandas")
+    #         df = self.db_manager.load_table_data(db_path, table_name)
+            
+    #         if len(df) > sample_size:
+    #             df = df.sample(n=sample_size, random_state=42).reset_index(drop=True)
+    #             logging.info(f"Sampled to {len(df):,} rows using pandas")
+            
+    #         duplicates = df.duplicated().sum()
+    #         logging.info(f"Duplicates in sampled data: {duplicates:,}")
+            
+    #         return df
 
     def analyze_table(self, db_path: str, table_name: str) -> Dict:
         """
@@ -277,12 +344,27 @@ class PrivacyMetricsCalculator:
         """
         # Use the DuckDBManager to load the data
         df = self.db_manager.load_table_data(db_path, table_name)
+        # df = self.sample_data_using_duckdb(db_path, table_name, self.sample_size)
         
         if df.empty:
             logging.error(f"Failed to load data from {table_name}")
             return {"error": f"Failed to load data from {table_name}"}
         
-        logging.info(f"Analyzing table: {table_name}")
+        total_count = len(df)
+        actual_sample_size = min(self.sample_size, total_count)
+        
+        logging.info(f"Table {table_name} has {total_count:,} rows, using {actual_sample_size:,} for analysis")
+        print(f"Table {table_name} has {total_count:,} rows, using {actual_sample_size:,} for analysis")
+        
+        # Sample the data to make computation feasible if necessary
+        if actual_sample_size < total_count:
+            df = df.sample(n=actual_sample_size, random_state=42).reset_index(drop=True)
+            
+            # Check for duplicates in the sample
+            duplicates = df.duplicated().sum()
+            logging.info(f"Duplicates in sampled data: {duplicates}")
+        
+        logging.info(f"Analyzing table: {table_name} with {len(df):,} rows")
         
         # Select appropriate quasi-identifiers based on table name
         if 'inpatient' in table_name:  # inpatient table
@@ -309,6 +391,8 @@ class PrivacyMetricsCalculator:
             "table_name": table_name,
             "quasi_identifiers": quasi_identifiers,
             "sensitive_attributes": self.sensitive_attributes,
+            "sample_size_used": len(df),
+            "total_table_size": total_count,
             "results": results,
             "timestamp": datetime.now().isoformat()
         }
@@ -357,6 +441,35 @@ class PrivacyMetricsCalculator:
                 indent=2
             )
         logging.info(f"Results saved to: {filepath}")
+
+    def get_sample_size_input(self, default=5000000):
+        """
+        Get user input for the sample size to use for calculations.
+        
+        Args:
+            default: Default sample size if no input is provided
+            
+        Returns:
+            Integer sample size
+        """
+        while True:
+            try:
+                print(f"\nEnter maximum number of samples to use for calculations (default: {default:,}):")
+                user_input = input("> ").strip()
+                
+                if not user_input:
+                    print(f"Using default sample size of {default:,}")
+                    return default
+                
+                sample_size = int(user_input.replace(',', ''))
+                if sample_size <= 0:
+                    print("Sample size must be positive. Please try again.")
+                    continue
+                
+                print(f"Using sample size of {sample_size:,}")
+                return sample_size
+            except ValueError:
+                print("Invalid input. Please enter a valid number.")
 
     def run_analysis(self):
         """Run the analysis workflow with user interaction"""
@@ -421,6 +534,7 @@ class PrivacyMetricsCalculator:
             
         results = {
             "database": selected_db,
+            "sample_size_requested": self.sample_size,
             "analyses": []
         }
         
