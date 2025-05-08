@@ -1,0 +1,271 @@
+{
+  "database": "limebit_mtgan.duckdb",
+  "sample_size_requested": 5000000,
+  "analyses": [
+    {
+      "table_name": "all_drugs",
+      "quasi_identifiers": [
+        "insurants_year_of_birth",
+        "insurants_gender",
+        "insurance_data_regional_code",
+        "drugs_date_of_prescription",
+        "drugs_date_of_dispense"
+      ],
+      "sensitive_attributes": [
+        "inpatient_diagnosis_diagnosis",
+        "inpatient_procedures_procedure_code",
+        "outpatient_diagnosis_diagnosis",
+        "outpatient_procedures_procedure_code",
+        "drugs_pharma_central_number",
+        "drugs_specialty_of_prescriber",
+        "drugs_atc"
+      ],
+      "sample_size_used": 331061,
+      "total_table_size": 331061,
+      "results": {
+        "k_anonymity": 1,
+        "average_group_size": 1.8829220295410725,
+        "total_groups": 175823,
+        "unique_records": 113331,
+        "vulnerable_groups": 166035,
+        "high_risk_percentage": 34.232664070971815,
+        "group_size_distribution": {
+          "groups_of_size_1": 113331,
+          "groups_of_size_2": 32505,
+          "groups_of_size_3": 13868,
+          "groups_of_size_4": 6331,
+          "groups_of_size_5": 3245,
+          "groups_of_size_6": 1833,
+          "groups_of_size_7": 1067,
+          "groups_of_size_8": 714,
+          "groups_of_size_9": 492,
+          "groups_of_size_10": 368,
+          "groups_larger_than_10": 2069
+        },
+        "entropy": 16.909858398773647,
+        "total_records": 331061,
+        "privacy_score": 65.76733592902819,
+        "l_diversity": {
+          "drugs_pharma_central_number": {
+            "l_diversity": 1,
+            "entropy_raw": 0.0,
+            "entropy_l_diversity": 1,
+            "average_entropy": 0.3730375793965455,
+            "average_distinct_values": 1.874658036775621,
+            "problematic_groups_count": 114224,
+            "total_groups": 175823,
+            "problematic_groups_percentage": 64.96533445567417
+          },
+          "drugs_specialty_of_prescriber": {
+            "l_diversity": 1,
+            "entropy_raw": 0.0,
+            "entropy_l_diversity": 1,
+            "average_entropy": 0.10820040930100856,
+            "average_distinct_values": 1.1898727697741478,
+            "problematic_groups_count": 149616,
+            "total_groups": 175823,
+            "problematic_groups_percentage": 85.09466907059941
+          },
+          "drugs_atc": {
+            "l_diversity": 1,
+            "entropy_raw": 0.0,
+            "entropy_l_diversity": 1,
+            "average_entropy": 0.35889728911874663,
+            "average_distinct_values": 1.8022386149707377,
+            "problematic_groups_count": 114788,
+            "total_groups": 175823,
+            "problematic_groups_percentage": 65.28611160087134
+          }
+        },
+        "t_closeness": {
+          "drugs_pharma_central_number": {
+            "t_closeness": 94572556.06667063,
+            "average_distance": 3982697.339839656,
+            "groups_violating_t": 175823,
+            "total_groups": 175823
+          },
+          "drugs_specialty_of_prescriber": {
+            "t_closeness": 44.79142514521493,
+            "average_distance": 8.764008340174591,
+            "groups_violating_t": 175823,
+            "total_groups": 175823
+          },
+          "drugs_atc": {
+            "t_closeness": 15.194618491505153,
+            "average_distance": 5.895093880674808,
+            "groups_violating_t": 175823,
+            "total_groups": 175823
+          }
+        }
+      },
+      "timestamp": "2025-05-04T18:55:50.377724"
+    },
+    {
+      "table_name": "all_inpatient",
+      "quasi_identifiers": [
+        "insurants_year_of_birth",
+        "insurants_gender",
+        "insurance_data_regional_code",
+        "inpatient_cases_date_of_admission",
+        "inpatient_cases_department_admission"
+      ],
+      "sensitive_attributes": [
+        "inpatient_diagnosis_diagnosis",
+        "inpatient_procedures_procedure_code",
+        "outpatient_diagnosis_diagnosis",
+        "outpatient_procedures_procedure_code",
+        "drugs_pharma_central_number",
+        "drugs_specialty_of_prescriber",
+        "drugs_atc"
+      ],
+      "sample_size_used": 5000000,
+      "total_table_size": 7039032,
+      "results": {
+        "k_anonymity": 1,
+        "average_group_size": 340.11291748860623,
+        "total_groups": 14701,
+        "unique_records": 94,
+        "vulnerable_groups": 862,
+        "high_risk_percentage": 0.00188,
+        "group_size_distribution": {
+          "groups_of_size_1": 94,
+          "groups_of_size_2": 163,
+          "groups_of_size_3": 240,
+          "groups_of_size_4": 365,
+          "groups_of_size_5": 504,
+          "groups_of_size_6": 646,
+          "groups_of_size_7": 784,
+          "groups_of_size_8": 828,
+          "groups_of_size_9": 858,
+          "groups_of_size_10": 748,
+          "groups_larger_than_10": 9471
+        },
+        "entropy": 8.2077802437969,
+        "total_records": 5000000,
+        "privacy_score": 99.99812,
+        "l_diversity": {
+          "inpatient_diagnosis_diagnosis": {
+            "l_diversity": 1,
+            "entropy_raw": 0.0,
+            "entropy_l_diversity": 1,
+            "average_entropy": 2.4200835012004145,
+            "average_distinct_values": 15.814230324467724,
+            "problematic_groups_count": 483,
+            "total_groups": 14701,
+            "problematic_groups_percentage": 3.285490782939936
+          },
+          "inpatient_procedures_procedure_code": {
+            "l_diversity": 1,
+            "entropy_raw": 0.0,
+            "entropy_l_diversity": 1,
+            "average_entropy": 0.3991284449676314,
+            "average_distinct_values": 2.515135024828243,
+            "problematic_groups_count": 10714,
+            "total_groups": 14701,
+            "problematic_groups_percentage": 72.87939595945853
+          }
+        },
+        "t_closeness": {
+          "inpatient_diagnosis_diagnosis": {
+            "t_closeness": 14.60505205988001,
+            "average_distance": 2.8398357954025446,
+            "groups_violating_t": 14701,
+            "total_groups": 14701
+          },
+          "inpatient_procedures_procedure_code": {
+            "t_closeness": 6.747143695806,
+            "average_distance": 4.7540930886893,
+            "groups_violating_t": 14700,
+            "total_groups": 14701
+          }
+        }
+      },
+      "timestamp": "2025-05-04T19:03:41.168614"
+    },
+    {
+      "table_name": "all_outpatient",
+      "quasi_identifiers": [
+        "insurants_year_of_birth",
+        "insurants_gender",
+        "insurance_data_regional_code",
+        "outpatient_cases_from",
+        "outpatient_cases_to",
+        "outpatient_cases_practice_code",
+        "outpatient_cases_year",
+        "outpatient_cases_quarter"
+      ],
+      "sensitive_attributes": [
+        "inpatient_diagnosis_diagnosis",
+        "inpatient_procedures_procedure_code",
+        "outpatient_diagnosis_diagnosis",
+        "outpatient_procedures_procedure_code",
+        "drugs_pharma_central_number",
+        "drugs_specialty_of_prescriber",
+        "drugs_atc"
+      ],
+      "sample_size_used": 5000000,
+      "total_table_size": 21513870,
+      "results": {
+        "k_anonymity": 1,
+        "average_group_size": 38.54693474774886,
+        "total_groups": 129712,
+        "unique_records": 10773,
+        "vulnerable_groups": 46210,
+        "high_risk_percentage": 0.21546,
+        "group_size_distribution": {
+          "groups_of_size_1": 10773,
+          "groups_of_size_2": 12711,
+          "groups_of_size_3": 12265,
+          "groups_of_size_4": 10461,
+          "groups_of_size_5": 9175,
+          "groups_of_size_6": 7723,
+          "groups_of_size_7": 6558,
+          "groups_of_size_8": 5672,
+          "groups_of_size_9": 5087,
+          "groups_of_size_10": 4484,
+          "groups_larger_than_10": 44803
+        },
+        "entropy": 11.835869225994049,
+        "total_records": 5000000,
+        "privacy_score": 99.78453999999999,
+        "l_diversity": {
+          "outpatient_diagnosis_diagnosis": {
+            "l_diversity": 1,
+            "entropy_raw": 0.0,
+            "entropy_l_diversity": 1,
+            "average_entropy": 1.712541119901456,
+            "average_distinct_values": 9.211784568891082,
+            "problematic_groups_count": 11035,
+            "total_groups": 129712,
+            "problematic_groups_percentage": 8.507308498828174
+          },
+          "outpatient_procedures_procedure_code": {
+            "l_diversity": 1,
+            "entropy_raw": 0.0,
+            "entropy_l_diversity": 1,
+            "average_entropy": 0.017681380318948836,
+            "average_distinct_values": 1.0403817688417416,
+            "problematic_groups_count": 127536,
+            "total_groups": 129712,
+            "problematic_groups_percentage": 98.32243739977797
+          }
+        },
+        "t_closeness": {
+          "outpatient_diagnosis_diagnosis": {
+            "t_closeness": 14.894637244960013,
+            "average_distance": 3.4279636174758004,
+            "groups_violating_t": 129712,
+            "total_groups": 129712
+          },
+          "outpatient_procedures_procedure_code": {
+            "t_closeness": 4.5957544367819985,
+            "average_distance": 4.441694178684837,
+            "groups_violating_t": 129712,
+            "total_groups": 129712
+          }
+        }
+      },
+      "timestamp": "2025-05-04T19:30:02.747008"
+    }
+  ]
+}
