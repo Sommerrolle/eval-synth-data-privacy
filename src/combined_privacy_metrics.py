@@ -21,7 +21,7 @@ from datetime import datetime
 from pathlib import Path
 
 # Import your existing modules
-from duckdb_manager import DuckDBManager
+from duckdb_manager.duckdb_manager import DuckDBManager
 from calculate_privacy_metrics import PrivacyMetricsCalculator
 from distance_metrics import DistanceMetricsCalculator
 

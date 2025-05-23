@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # Import your duckdb_manager
-from duckdb_manager import DuckDBManager
+from duckdb_manager.duckdb_manager import DuckDBManager
 # Import the feature preprocessing module
 from feature_preprocessing import FeaturePreprocessor
 from pca_analysis import analyze_principal_components

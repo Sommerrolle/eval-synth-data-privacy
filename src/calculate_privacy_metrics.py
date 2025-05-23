@@ -9,7 +9,7 @@ import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 import time
 import logging
-from duckdb_manager import DuckDBManager
+from duckdb_manager.duckdb_manager import DuckDBManager
 from feature_preprocessing import preprocess_single_dataframe
 
 
