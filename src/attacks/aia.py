@@ -56,20 +56,152 @@ class AttributeInferenceAttack:
         synth_subset = synthetic_df[cols_to_use].copy()
         
         # Remove rows with missing sensitive attributes (we need ground truth)
-        # TODO also remove if the value is UNKNOWN or otherwise missing
-        # Remove rows with missing sensitive attributes (we need ground truth)
-        for sensitive_attr in sensitive_attributes:
-            orig_subset = orig_subset.dropna(subset=[sensitive_attr])
-            synth_subset = synth_subset.dropna(subset=[sensitive_attr])
-            # Also remove rows where sensitive attribute is "UNKNOWN" or similar placeholder values
-            # 00000000 für pharma central number
-            # 0000 department of admission 
-            unknown_values = ['UNKNOWN', 'UUU', 'NULL', 'NaN', '', 'NA', 'MISSING', '00000000', '0000']
-            orig_subset = orig_subset[~orig_subset[sensitive_attr].astype(str).str.upper().isin(unknown_values)]
-            synth_subset = synth_subset[~synth_subset[sensitive_attr].astype(str).str.upper().isin(unknown_values)]
+        # for sensitive_attr in sensitive_attributes:
+        #     orig_subset = orig_subset.dropna(subset=[sensitive_attr])
+        #     synth_subset = synth_subset.dropna(subset=[sensitive_attr])
+        #     # Also remove rows where sensitive attribute is "UNKNOWN" or similar placeholder values
+        #     # 00000000 für pharma central number
+        #     # 0000 department of admission 
+        #     unknown_values = ['UNKNOWN', 'UUU', 'NULL', 'NaN', '', 'NA', 'MISSING', '00000000', '0000']
+        #     orig_subset = orig_subset[~orig_subset[sensitive_attr].astype(str).str.upper().isin(unknown_values)]
+        #     synth_subset = synth_subset[~synth_subset[sensitive_attr].astype(str).str.upper().isin(unknown_values)]
         
         return orig_subset, synth_subset, quasi_identifiers, sensitive_attributes
-    
+
+    def sample_overlapping_data(self, original_df: pd.DataFrame, synthetic_df: pd.DataFrame, 
+                            sensitive_attribute: str, synthetic_sample_size: int = 5000, 
+                            strategy: str = 'random') -> Tuple[pd.DataFrame, pd.DataFrame, Dict]:
+        """
+        Sample synthetic data and filter original data to only include overlapping sensitive attribute values.
+        Ensures exact sample size by filtering out unknown values before sampling.
+        
+        Args:
+            original_df: Original dataset
+            synthetic_df: Synthetic dataset
+            sensitive_attribute: Column name of the sensitive attribute to match on
+            synthetic_sample_size: Size of synthetic sample to create (exact size)
+            strategy: Sampling strategy - 'random', 'stratified', or 'common'
+        
+        Returns:
+            Tuple of (filtered_original_df, synthetic_sample_df, overlap_stats)
+        """
+        
+        logging.info(f"Sampling overlapping data for attribute: {sensitive_attribute}")
+        
+        # Validate inputs
+        if sensitive_attribute not in original_df.columns:
+            raise ValueError(f"Sensitive attribute '{sensitive_attribute}' not found in original data")
+        if sensitive_attribute not in synthetic_df.columns:
+            raise ValueError(f"Sensitive attribute '{sensitive_attribute}' not found in synthetic data")
+        
+        # Step 1: Pre-filter synthetic data to remove unknown/placeholder values
+        unknown_values = {'UNKNOWN', 'UUU', 'NULL', 'NaN', '', 'NA', 'MISSING', '00000000', '0000'}
+        
+        # Filter synthetic data to exclude unknown values and missing data
+        synthetic_clean = synthetic_df[
+            ~synthetic_df[sensitive_attribute].astype(str).isin(unknown_values) &
+            synthetic_df[sensitive_attribute].notna()
+        ].copy()
+        
+        logging.info(f"Synthetic data: {len(synthetic_df):,} --> {len(synthetic_clean):,} records after removing unknown values")
+        
+        if len(synthetic_clean) < synthetic_sample_size:
+            logging.warning(f"Not enough clean synthetic data ({len(synthetic_clean)}) to reach desired sample size ({synthetic_sample_size})")
+            effective_sample_size = len(synthetic_clean)
+        else:
+            effective_sample_size = synthetic_sample_size
+        
+        # Step 2: Sample synthetic data using specified strategy
+        if strategy == 'random':
+            synthetic_sample = synthetic_clean.sample(
+                n=effective_sample_size, 
+                random_state=42
+            )
+            
+        elif strategy == 'stratified':
+            # Maintain diagnosis distribution proportionally
+            synthetic_sample = synthetic_clean.groupby(sensitive_attribute, group_keys=False).apply(
+                lambda x: x.sample(
+                    min(len(x), max(1, effective_sample_size * len(x) // len(synthetic_clean))),
+                    random_state=42
+                )
+            ).reset_index(drop=True)
+            
+            # Ensure we get exactly the desired sample size (or as close as possible)
+            if len(synthetic_sample) > effective_sample_size:
+                synthetic_sample = synthetic_sample.sample(n=effective_sample_size, random_state=42)
+            elif len(synthetic_sample) < effective_sample_size:
+                # If stratified sampling didn't get enough samples, fill with random samples
+                remaining_needed = effective_sample_size - len(synthetic_sample)
+                remaining_pool = synthetic_clean.drop(synthetic_sample.index)
+                if len(remaining_pool) >= remaining_needed:
+                    additional_samples = remaining_pool.sample(n=remaining_needed, random_state=42)
+                    synthetic_sample = pd.concat([synthetic_sample, additional_samples]).reset_index(drop=True)
+                
+        elif strategy == 'common':
+            # Focus on most common values (realistic adversary knowledge)
+            top_values = synthetic_clean[sensitive_attribute].value_counts().head(500).index
+            synthetic_filtered = synthetic_clean[synthetic_clean[sensitive_attribute].isin(top_values)]
+            
+            if len(synthetic_filtered) < effective_sample_size:
+                logging.warning(f"Not enough records with common values ({len(synthetic_filtered)}) for desired sample size")
+                synthetic_sample = synthetic_filtered.copy()
+            else:
+                synthetic_sample = synthetic_filtered.sample(n=effective_sample_size, random_state=42)
+                
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}. Use 'random', 'stratified', or 'common'")
+        
+        # Step 3: Get overlapping values from the clean synthetic sample
+        synthetic_values = set(synthetic_sample[sensitive_attribute].astype(str).unique())
+        
+        # Step 4: Filter original data to overlapping values only (also exclude unknown values)
+        original_clean = original_df[
+            ~original_df[sensitive_attribute].astype(str).isin(unknown_values) &
+            original_df[sensitive_attribute].notna()
+        ].copy()
+        
+        original_filtered = original_clean[
+            original_clean[sensitive_attribute].astype(str).isin(synthetic_values)
+        ].copy()
+        
+        # Step 5: Calculate overlap statistics
+        orig_total_values = len(original_clean[sensitive_attribute].unique())
+        orig_filtered_values = len(original_filtered[sensitive_attribute].unique())
+        synth_values_count = len(synthetic_values)
+        
+        overlap_stats = {
+            'original_total_records': len(original_df),
+            'original_clean_records': len(original_clean),
+            'original_filtered_records': len(original_filtered),
+            'synthetic_total_records': len(synthetic_df),
+            'synthetic_clean_records': len(synthetic_clean),
+            'synthetic_sample_records': len(synthetic_sample),
+            'requested_sample_size': synthetic_sample_size,
+            'achieved_sample_size': len(synthetic_sample),
+            'original_total_values': orig_total_values,
+            'original_filtered_values': orig_filtered_values,
+            'synthetic_values': synth_values_count,
+            'overlap_ratio': orig_filtered_values / orig_total_values if orig_total_values > 0 else 0,
+            'filtering_ratio': len(original_filtered) / len(original_clean) if len(original_clean) > 0 else 0,
+            'strategy_used': strategy,
+            'sensitive_attribute': sensitive_attribute
+        }
+        
+        # Log statistics
+        logging.info(f"Overlap Sampling Results:")
+        logging.info(f"  Strategy: {strategy}")
+        logging.info(f"  Requested sample size: {synthetic_sample_size:,}")
+        logging.info(f"  Achieved sample size: {len(synthetic_sample):,}")
+        logging.info(f"  Original (clean): {len(original_clean):,} --> {len(original_filtered):,} records "
+                    f"({overlap_stats['filtering_ratio']:.1%} retained)")
+        logging.info(f"  Synthetic (clean): {len(synthetic_clean):,} --> {len(synthetic_sample):,} records")
+        logging.info(f"  Value overlap: {orig_filtered_values}/{orig_total_values} "
+                    f"({overlap_stats['overlap_ratio']:.1%})")
+        
+        return original_filtered, synthetic_sample, overlap_stats
+
+
     def encode_features(self, original_df: pd.DataFrame, synthetic_df: pd.DataFrame,
                        quasi_identifiers: List[str]) -> Tuple:
         """
@@ -443,8 +575,9 @@ class AttributeInferenceAttack:
         
         # Test different knowledge ratios
         # knowledge_ratios = [0.3, 0.5, 0.7, 0.9]
-        knowledge_ratios = [0.9]
-        k_values = [3, 5, 10]
+        # k_values = [3, 5, 10]
+        knowledge_ratios = [1.0]
+        k_values = [5]
         
         for sensitive_attr in sens_attrs:
             if sensitive_attr not in orig_df.columns or sensitive_attr not in synth_df.columns:
@@ -577,3 +710,4 @@ class AttributeInferenceAttack:
         
         logging.info(f"AIA results saved to: {filepath}")
         return filepath
+

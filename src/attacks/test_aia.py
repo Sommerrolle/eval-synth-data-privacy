@@ -25,7 +25,8 @@ def test_inpatient_aia():
     # Configuration for focused test
     ORIGINAL_DB = "claims_data.duckdb"  # Your original database
     SYNTHETIC_DB = "cprd_bn.duckdb"  # Test with one synthetic database first
-    TABLE_NAME = "clean_join_2017_inpatient"  # Focus on inpatient table from 2017
+    # TABLE_NAME = "clean_join_2019_inpatient"  # Focus on inpatient table from 2017
+    TABLE_NAME = "all_inpatient"  # alle mal testen
     
     # Your specified quasi-identifiers
     quasi_identifiers = [
@@ -82,15 +83,28 @@ def test_inpatient_aia():
         orig_top_diagnoses = original_data['inpatient_diagnosis_diagnosis'].value_counts().head(10)
         print(f"\nTop 10 original diagnoses:")
         print(orig_top_diagnoses)
+
+        # Sample data with overlapping data function
+        original_filtered, synthetic_sample, stats = aia_evaluator.sample_overlapping_data(
+            original_data, 
+            synthetic_data,
+            sensitive_attribute='inpatient_diagnosis_diagnosis',
+            synthetic_sample_size=150000,  # Exact size of clean samples
+            strategy='common'
+        )
+
+        print(f"Requested: {stats['requested_sample_size']:,}")
+        print(f"Achieved: {stats['achieved_sample_size']:,}")
+        print(f"Clean synthetic records available: {stats['synthetic_clean_records']:,}")
         
         # Run AIA evaluation with smaller sample for testing
         print(f"\nRunning AIA evaluation...")
         results = aia_evaluator.evaluate_aia_vulnerability(
-            original_data, 
-            synthetic_data,
+            original_filtered, 
+            synthetic_sample,
             quasi_identifiers, 
             sensitive_attributes,
-            sample_size=500000  # Small sample for testing
+            sample_size=100000  # Small sample for testing
         )
         
         # Display results
@@ -140,45 +154,6 @@ def test_inpatient_aia():
         print(f"Error during evaluation: {str(e)}")
         logging.error(f"AIA test failed: {str(e)}", exc_info=True)
 
-def analyze_dimensionality_impact():
-    """
-    Analyze the impact of different encoding strategies on dimensionality
-    """
-    
-    print("\n" + "="*80)
-    print("DIMENSIONALITY ANALYSIS")
-    print("="*80)
-    
-    # Your quasi-identifiers
-    quasi_identifiers = [
-        "insurants_year_of_birth",        # Numeric: 1 dimension
-        "insurants_gender",               # Categorical (2 values): 1 dimension with label encoding  
-        "insurance_data_regional_code",   # Categorical (~100 values): 1 dimension with label encoding
-        "inpatient_cases_date_of_admission",  # Date: 1 dimension (days since epoch)
-        "inpatient_cases_department_admission"  # Categorical (~50 values): 1 dimension with label encoding
-    ]
-    
-    print("Quasi-Identifier Dimensions:")
-    print("- insurants_year_of_birth: 1 (numeric)")
-    print("- insurants_gender: 1 (label encoded: 0,1)")  
-    print("- insurance_data_regional_code: 1 (label encoded: 0-99)")
-    print("- inpatient_cases_date_of_admission: 1 (days since epoch)")
-    print("- inpatient_cases_department_admission: 1 (label encoded: 0-49)")
-    print("TOTAL QI DIMENSIONS: 5")
-    
-    print(f"\nSensitive Attribute (diagnosis codes):")
-    print("- With One-Hot Encoding: 2731 dimensions ❌ (curse of dimensionality)")
-    print("- With Label Encoding: 1 dimension ✅ (feasible for k-NN)")
-    print("- Random Forest: Handles both well ✅")
-    
-    print(f"\nRecommendation:")
-    print("✅ Use Label Encoding for categorical variables")
-    print("✅ Total feature space: 5 dimensions (very manageable)")
-    print("✅ Both k-NN and Random Forest will work efficiently")
-
 if __name__ == "__main__":
     # Run the focused test
     test_inpatient_aia()
-    
-    # Show dimensionality analysis
-    analyze_dimensionality_impact()
