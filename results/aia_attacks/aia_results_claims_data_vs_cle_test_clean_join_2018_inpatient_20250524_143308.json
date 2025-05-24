@@ -1,0 +1,660 @@
+{
+  "dataset_info": {
+    "original_size": 100000,
+    "synthetic_size": 100000,
+    "n_quasi_identifiers": 5,
+    "n_sensitive_attributes": 1
+  },
+  "attacks": {
+    "inpatient_diagnosis_diagnosis": {
+      "knn_attacks": [
+        {
+          "success_rate": 0.10424,
+          "total_attacks": 100000,
+          "successful_attacks": 10424,
+          "knowledge_ratio": 1.0,
+          "k_neighbors": 5,
+          "n_known_features": 5,
+          "n_total_features": 5,
+          "avg_distance_to_neighbors": 0.08129026207153664,
+          "detailed_results": [
+            {
+              "true_value": "E785",
+              "inferred_value": "R599",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "Z432",
+              "inferred_value": "K650",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "J90",
+              "inferred_value": "J90",
+              "success": true,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "Z880",
+              "inferred_value": "B962",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "E785",
+              "inferred_value": "R599",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "F4541",
+              "inferred_value": "F4541",
+              "success": true,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "Z290",
+              "inferred_value": "F4541",
+              "success": false,
+              "avg_distance": 0.37935112752049127
+            },
+            {
+              "true_value": "K5721",
+              "inferred_value": "K650",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "E038",
+              "inferred_value": "N1799",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "I208",
+              "inferred_value": "R060",
+              "success": false,
+              "avg_distance": 0.09458591572401312
+            },
+            {
+              "true_value": "U5000",
+              "inferred_value": "K650",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "R568",
+              "inferred_value": "R509",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "I352",
+              "inferred_value": "I481",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "M321",
+              "inferred_value": "U8030",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "T810",
+              "inferred_value": "I481",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "T818",
+              "inferred_value": "K650",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "N183",
+              "inferred_value": "Z921",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "E890",
+              "inferred_value": "Z11",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "F332",
+              "inferred_value": "I1000",
+              "success": false,
+              "avg_distance": 0.26984393965451237
+            },
+            {
+              "true_value": "M0699",
+              "inferred_value": "Z9665",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "M329",
+              "inferred_value": "G430",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "R11",
+              "inferred_value": "R060",
+              "success": false,
+              "avg_distance": 0.47139156597252285
+            },
+            {
+              "true_value": "R400",
+              "inferred_value": "N258",
+              "success": false,
+              "avg_distance": 0.16832286947602904
+            },
+            {
+              "true_value": "Z11",
+              "inferred_value": "I2512",
+              "success": false,
+              "avg_distance": 0.36695854968424313
+            },
+            {
+              "true_value": "E038",
+              "inferred_value": "M329",
+              "success": false,
+              "avg_distance": 0.09427162377867149
+            },
+            {
+              "true_value": "F331",
+              "inferred_value": "F331",
+              "success": true,
+              "avg_distance": 0.3581130758890741
+            },
+            {
+              "true_value": "Z741",
+              "inferred_value": "M321",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "D472",
+              "inferred_value": "U8030",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "R451",
+              "inferred_value": "M321",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "I5013",
+              "inferred_value": "U6900",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "F171",
+              "inferred_value": "J4489",
+              "success": false,
+              "avg_distance": 0.187963875372297
+            },
+            {
+              "true_value": "M544",
+              "inferred_value": "F510",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "Y579",
+              "inferred_value": "Y579",
+              "success": true,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "E890",
+              "inferred_value": "Z11",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "Z038",
+              "inferred_value": "G470",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "N390",
+              "inferred_value": "I1000",
+              "success": false,
+              "avg_distance": 0.0657671674841324
+            },
+            {
+              "true_value": "N258",
+              "inferred_value": "E038",
+              "success": false,
+              "avg_distance": 0.19233908336396965
+            },
+            {
+              "true_value": "G992",
+              "inferred_value": "M4802",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "K5730",
+              "inferred_value": "J991",
+              "success": false,
+              "avg_distance": 0.1326501629026693
+            },
+            {
+              "true_value": "R634",
+              "inferred_value": "B952",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "Z11",
+              "inferred_value": "R650",
+              "success": false,
+              "avg_distance": 0.5947713154623154
+            },
+            {
+              "true_value": "F432",
+              "inferred_value": "G409",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "G618",
+              "inferred_value": "M321",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "Z491",
+              "inferred_value": "Z491",
+              "success": true,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "K720",
+              "inferred_value": "D684",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "F152",
+              "inferred_value": "F4541",
+              "success": false,
+              "avg_distance": 0.26864643416517703
+            },
+            {
+              "true_value": "R634",
+              "inferred_value": "B952",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "U520",
+              "inferred_value": "U5020",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "K640",
+              "inferred_value": "B952",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "D685",
+              "inferred_value": "A090",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "T818",
+              "inferred_value": "K650",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "R18",
+              "inferred_value": "M2550",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "Z921",
+              "inferred_value": "R42",
+              "success": false,
+              "avg_distance": 0.1794721457224923
+            },
+            {
+              "true_value": "M328",
+              "inferred_value": "I1000",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "T810",
+              "inferred_value": "J4489",
+              "success": false,
+              "avg_distance": 0.187963875372297
+            },
+            {
+              "true_value": "E876",
+              "inferred_value": "N258",
+              "success": false,
+              "avg_distance": 0.16832286947602904
+            },
+            {
+              "true_value": "D648",
+              "inferred_value": "U8030",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "D630",
+              "inferred_value": "I5001",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "G810",
+              "inferred_value": "M321",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "J9601",
+              "inferred_value": "Z290",
+              "success": false,
+              "avg_distance": 0.21826797406787604
+            },
+            {
+              "true_value": "U5050",
+              "inferred_value": "Y579",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "Z921",
+              "inferred_value": "G810",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "M321",
+              "inferred_value": "E440",
+              "success": false,
+              "avg_distance": 0.35984485043327125
+            },
+            {
+              "true_value": "E1190",
+              "inferred_value": "I1090",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "E038",
+              "inferred_value": "T802",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "Z228",
+              "inferred_value": "B952",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "M321",
+              "inferred_value": "F332",
+              "success": false,
+              "avg_distance": 0.2803955313577347
+            },
+            {
+              "true_value": "R11",
+              "inferred_value": "Z922",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "N185",
+              "inferred_value": "T802",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "I5014",
+              "inferred_value": "I482",
+              "success": false,
+              "avg_distance": 0.08539986485596326
+            },
+            {
+              "true_value": "T827",
+              "inferred_value": "U8030",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "S8218",
+              "inferred_value": "S8218",
+              "success": true,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "E785",
+              "inferred_value": "J4489",
+              "success": false,
+              "avg_distance": 0.187963875372297
+            },
+            {
+              "true_value": "Z926",
+              "inferred_value": "K565",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "F332",
+              "inferred_value": "F332",
+              "success": true,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "I7023",
+              "inferred_value": "N185",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "S8218",
+              "inferred_value": "S8218",
+              "success": true,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "Z290",
+              "inferred_value": "A090",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "S8218",
+              "inferred_value": "S8218",
+              "success": true,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "R15",
+              "inferred_value": "E1172",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "G409",
+              "inferred_value": "G409",
+              "success": true,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "E782",
+              "inferred_value": "I214",
+              "success": false,
+              "avg_distance": 0.017524845438037145
+            },
+            {
+              "true_value": "I340",
+              "inferred_value": "R060",
+              "success": false,
+              "avg_distance": 0.47139156597252285
+            },
+            {
+              "true_value": "J90",
+              "inferred_value": "T802",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "K922",
+              "inferred_value": "K922",
+              "success": true,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "M754",
+              "inferred_value": "I730",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "T814",
+              "inferred_value": "B956",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "Y69",
+              "inferred_value": "T802",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "K1228",
+              "inferred_value": "B9548",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "E211",
+              "inferred_value": "G409",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "N183",
+              "inferred_value": "I5001",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "Z9581",
+              "inferred_value": "I313",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "M754",
+              "inferred_value": "I730",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "F450",
+              "inferred_value": "F332",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "Z740",
+              "inferred_value": "U8030",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "Z466",
+              "inferred_value": "M328",
+              "success": false,
+              "avg_distance": 0.2559061320601961
+            },
+            {
+              "true_value": "D638",
+              "inferred_value": "T802",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "N085",
+              "inferred_value": "T802",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "I5013",
+              "inferred_value": "T802",
+              "success": false,
+              "avg_distance": 0.0
+            },
+            {
+              "true_value": "F332",
+              "inferred_value": "F332",
+              "success": true,
+              "avg_distance": 0.0
+            }
+          ],
+          "attack_type": "knn_k5_knowledge1.0"
+        }
+      ],
+      "ml_attacks": [
+        {
+          "success_rate": 0.14367,
+          "cv_score_mean": 0.24386000000000002,
+          "cv_score_std": 0.0017479702514631079,
+          "training_samples": 100000,
+          "test_samples": 100000,
+          "knowledge_ratio": 1.0,
+          "n_known_features": 5,
+          "n_total_features": 5,
+          "unique_train_labels": 500,
+          "unique_test_labels": 490,
+          "labels_overlap": 490,
+          "total_unique_labels": 500,
+          "attack_type": "ml_knowledge1.0"
+        }
+      ]
+    }
+  },
+  "summary": {
+    "max_success_rates": {
+      "inpatient_diagnosis_diagnosis": 0.14367
+    },
+    "avg_success_rates": {
+      "inpatient_diagnosis_diagnosis": 0.123955
+    },
+    "vulnerability_assessment": {
+      "inpatient_diagnosis_diagnosis": {
+        "risk_level": "MINIMAL",
+        "max_success_rate": 0.14367,
+        "interpretation": "Minimal privacy risk (success rate: 14.4%). Inference attacks largely unsuccessful."
+      }
+    }
+  },
+  "timestamp": "2025-05-24T14:33:08.925604"
+}

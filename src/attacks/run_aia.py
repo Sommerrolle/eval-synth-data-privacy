@@ -24,9 +24,9 @@ def test_inpatient_aia():
     
     # Configuration for focused test
     ORIGINAL_DB = "claims_data.duckdb"  # Your original database
-    SYNTHETIC_DB = "cprd_bn.duckdb"  # Test with one synthetic database first
-    # TABLE_NAME = "clean_join_2019_inpatient"  # Focus on inpatient table from 2017
-    TABLE_NAME = "all_inpatient"  # alle mal testen
+    SYNTHETIC_DB = "cle_test.duckdb"  # Test with one synthetic database first
+    TABLE_NAME = "clean_join_2018_inpatient"  # Focus on inpatient table from 2017
+    # TABLE_NAME = "all_inpatient"  # alle mal testen
     
     # Your specified quasi-identifiers
     quasi_identifiers = [
@@ -89,7 +89,7 @@ def test_inpatient_aia():
             original_data, 
             synthetic_data,
             sensitive_attribute='inpatient_diagnosis_diagnosis',
-            synthetic_sample_size=150000,  # Exact size of clean samples
+            synthetic_sample_size=100000,  # Exact size of clean samples
             strategy='common'
         )
 
