@@ -200,6 +200,41 @@ class AttributeInferenceAttack:
                     f"({overlap_stats['overlap_ratio']:.1%})")
         
         return original_filtered, synthetic_sample, overlap_stats
+    
+
+    def add_overlap_statistics_to_results(self, results: Dict, overlap_stats: Dict, 
+                                        sensitive_attribute: str = None) -> Dict:
+        """
+        Add overlap statistics to existing AIA results dictionary.
+        
+        Args:
+            results: Existing AIA results dictionary
+            overlap_stats: Overlap statistics returned from sample_overlapping_data()
+            sensitive_attribute: Name of the sensitive attribute (optional, will be extracted from stats if not provided)
+            
+        Returns:
+            Updated results dictionary with overlap statistics
+        """
+        # Extract sensitive attribute name from stats if not provided
+        if sensitive_attribute is None:
+            sensitive_attribute = overlap_stats.get('sensitive_attribute', 'unknown_attribute')
+        
+        # Initialize overlap_statistics section if it doesn't exist
+        if 'overlap_statistics' not in results:
+            results['overlap_statistics'] = {}
+        
+        # Add the overlap stats for this sensitive attribute
+        results['overlap_statistics'][sensitive_attribute] = overlap_stats.copy()
+        
+        # Add a timestamp for when these stats were added
+        # results['overlap_statistics'][sensitive_attribute]['stats_added_timestamp'] = datetime.now().isoformat()
+        
+        # logging.info(f"Added overlap statistics for {sensitive_attribute} to results")
+        # logging.info(f"  Overlap ratio: {overlap_stats.get('overlap_ratio', 'N/A'):.1%}")
+        # logging.info(f"  Filtering ratio: {overlap_stats.get('filtering_ratio', 'N/A'):.1%}")
+        # logging.info(f"  Synthetic sample size: {overlap_stats.get('achieved_sample_size', 'N/A'):,}")
+        
+        return results
 
 
     def encode_features(self, original_df: pd.DataFrame, synthetic_df: pd.DataFrame,
@@ -391,7 +426,7 @@ class AttributeInferenceAttack:
             'n_known_features': n_known_features,
             'n_total_features': n_features,
             'avg_distance_to_neighbors': np.mean([r['avg_distance'] for r in attack_results]),
-            'detailed_results': attack_results[:100]  # Store first 100 for analysis
+            # 'detailed_results': attack_results[:100]  # Store first 100 for analysis
         }
     
     def machine_learning_attack(self, original_encoded: np.ndarray, synthetic_encoded: np.ndarray,
@@ -487,7 +522,7 @@ class AttributeInferenceAttack:
             y_test_final = y_test_encoded
         
         # Train classifier
-        clf = RandomForestClassifier(n_estimators=100, random_state=42, n_jobs=-1)
+        clf = RandomForestClassifier(n_estimators=128, random_state=42, n_jobs=-1)
         
         try:
             clf.fit(X_train, y_train_final)
@@ -570,6 +605,7 @@ class AttributeInferenceAttack:
                 'n_quasi_identifiers': len(qi_cols),
                 'n_sensitive_attributes': len(sens_attrs)
             },
+            'overlap_statistics': {},
             'attacks': {}
         }
         
@@ -577,7 +613,7 @@ class AttributeInferenceAttack:
         # knowledge_ratios = [0.3, 0.5, 0.7, 0.9]
         # k_values = [3, 5, 10]
         knowledge_ratios = [1.0]
-        k_values = [5]
+        k_values = [1,3,5,10, 100]
         
         for sensitive_attr in sens_attrs:
             if sensitive_attr not in orig_df.columns or sensitive_attr not in synth_df.columns:

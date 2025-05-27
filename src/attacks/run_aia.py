@@ -38,8 +38,11 @@ def test_inpatient_aia():
     ]
     
     # Focus on diagnosis only for initial test
+    # sensitive_attributes = [
+    #     "inpatient_diagnosis_diagnosis"  # Start with just this one
+    # ]
     sensitive_attributes = [
-        "inpatient_diagnosis_diagnosis"  # Start with just this one
+        "inpatient_procedures_procedure_code"
     ]
     
     print("="*80)
@@ -76,11 +79,11 @@ def test_inpatient_aia():
         
         # Check diagnosis code distribution before filtering
         print(f"\nDiagnosis code analysis:")
-        print(f"Original unique diagnoses: {original_data['inpatient_diagnosis_diagnosis'].nunique()}")
-        print(f"Synthetic unique diagnoses: {synthetic_data['inpatient_diagnosis_diagnosis'].nunique()}")
+        print(f"Original unique diagnoses: {original_data['inpatient_procedures_procedure_code'].nunique()}")
+        print(f"Synthetic unique diagnoses: {synthetic_data['inpatient_procedures_procedure_code'].nunique()}")
         
         # Show most common diagnosis codes
-        orig_top_diagnoses = original_data['inpatient_diagnosis_diagnosis'].value_counts().head(10)
+        orig_top_diagnoses = original_data['inpatient_procedures_procedure_code'].value_counts().head(10)
         print(f"\nTop 10 original diagnoses:")
         print(orig_top_diagnoses)
 
@@ -88,7 +91,7 @@ def test_inpatient_aia():
         original_filtered, synthetic_sample, stats = aia_evaluator.sample_overlapping_data(
             original_data, 
             synthetic_data,
-            sensitive_attribute='inpatient_diagnosis_diagnosis',
+            sensitive_attribute='inpatient_procedures_procedure_code',
             synthetic_sample_size=100000,  # Exact size of clean samples
             strategy='common'
         )
@@ -107,6 +110,19 @@ def test_inpatient_aia():
             sample_size=100000  # Small sample for testing
         )
         
+        # Add overlap statistics to the results
+        results = aia_evaluator.add_overlap_statistics_to_results(
+            results, 
+            stats, 
+            sensitive_attribute='inpatient_procedures_procedure_code'
+        )
+
+        results = aia_evaluator.add_overlap_statistics_to_results(
+            results, 
+            stats, 
+            sensitive_attribute='inpatient_diagnosis_diagnosise'
+        )
+
         # Display results
         print(f"\n" + "="*60)
         print("AIA EVALUATION RESULTS")
@@ -121,7 +137,7 @@ def test_inpatient_aia():
         
         # Show detailed attack results for diagnosis
         if 'attacks' in results:
-            diagnosis_attacks = results['attacks'].get('inpatient_diagnosis_diagnosis', {})
+            diagnosis_attacks = results['attacks'].get('inpatient_procedures_procedure_code', {})
             
             print(f"\nDetailed Attack Results for Diagnosis:")
             print("-" * 50)
