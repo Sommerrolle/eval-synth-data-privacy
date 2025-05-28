@@ -1,0 +1,221 @@
+{
+  "dataset_info": {
+    "original_size": 5623799,
+    "synthetic_size": 159487,
+    "n_quasi_identifiers": 5,
+    "n_sensitive_attributes": 2
+  },
+  "overlap_statistics": {
+    "inpatient_diagnosis_diagnosis": {
+      "original_total_records": 5623799,
+      "original_clean_records": 5618637,
+      "original_filtered_records": 2473727,
+      "synthetic_total_records": 159487,
+      "synthetic_clean_records": 93524,
+      "synthetic_sample_records": 55000,
+      "requested_sample_size": 55000,
+      "achieved_sample_size": 55000,
+      "original_total_values": 3464,
+      "original_filtered_values": 456,
+      "synthetic_values": 500,
+      "overlap_ratio": 0.13163972286374134,
+      "filtering_ratio": 0.44027172426337563,
+      "strategy_used": "common",
+      "sensitive_attribute": "inpatient_diagnosis_diagnosis"
+    },
+    "inpatient_procedures_procedure_code": {
+      "original_total_records": 5623799,
+      "original_clean_records": 5535334,
+      "original_filtered_records": 3954071,
+      "synthetic_total_records": 159487,
+      "synthetic_clean_records": 3658,
+      "synthetic_sample_records": 3658,
+      "requested_sample_size": 55000,
+      "achieved_sample_size": 3658,
+      "original_total_values": 2232,
+      "original_filtered_values": 349,
+      "synthetic_values": 405,
+      "overlap_ratio": 0.15636200716845877,
+      "filtering_ratio": 0.7143328659119756,
+      "strategy_used": "common",
+      "sensitive_attribute": "inpatient_procedures_procedure_code"
+    }
+  },
+  "attacks": {
+    "inpatient_diagnosis_diagnosis": {
+      "knn_attacks": [
+        {
+          "success_rate": 0.007654545454545455,
+          "total_attacks": 55000,
+          "successful_attacks": 421,
+          "knowledge_ratio": 1.0,
+          "k_neighbors": 1,
+          "n_known_features": 5,
+          "n_total_features": 5,
+          "avg_distance_to_neighbors": 0.23615531268847853,
+          "attack_type": "knn_k1_knowledge1.0"
+        },
+        {
+          "success_rate": 0.0022181818181818184,
+          "total_attacks": 55000,
+          "successful_attacks": 122,
+          "knowledge_ratio": 1.0,
+          "k_neighbors": 3,
+          "n_known_features": 5,
+          "n_total_features": 5,
+          "avg_distance_to_neighbors": 0.28242254920119947,
+          "attack_type": "knn_k3_knowledge1.0"
+        },
+        {
+          "success_rate": 0.003981818181818182,
+          "total_attacks": 55000,
+          "successful_attacks": 219,
+          "knowledge_ratio": 1.0,
+          "k_neighbors": 5,
+          "n_known_features": 5,
+          "n_total_features": 5,
+          "avg_distance_to_neighbors": 0.3115934532792345,
+          "attack_type": "knn_k5_knowledge1.0"
+        },
+        {
+          "success_rate": 0.006327272727272727,
+          "total_attacks": 55000,
+          "successful_attacks": 348,
+          "knowledge_ratio": 1.0,
+          "k_neighbors": 10,
+          "n_known_features": 5,
+          "n_total_features": 5,
+          "avg_distance_to_neighbors": 0.3586470805589488,
+          "attack_type": "knn_k10_knowledge1.0"
+        },
+        {
+          "success_rate": 0.004236363636363636,
+          "total_attacks": 55000,
+          "successful_attacks": 233,
+          "knowledge_ratio": 1.0,
+          "k_neighbors": 100,
+          "n_known_features": 5,
+          "n_total_features": 5,
+          "avg_distance_to_neighbors": 0.6025753982083111,
+          "attack_type": "knn_k100_knowledge1.0"
+        }
+      ],
+      "ml_attacks": [
+        {
+          "success_rate": 0.014072727272727273,
+          "cv_score_mean": 0.2348909090909091,
+          "cv_score_std": 0.0017214255096064904,
+          "training_samples": 55000,
+          "test_samples": 55000,
+          "knowledge_ratio": 1.0,
+          "n_known_features": 5,
+          "n_total_features": 5,
+          "unique_train_labels": 500,
+          "unique_test_labels": 428,
+          "labels_overlap": 428,
+          "total_unique_labels": 500,
+          "attack_type": "ml_knowledge1.0"
+        }
+      ]
+    },
+    "inpatient_procedures_procedure_code": {
+      "knn_attacks": [
+        {
+          "success_rate": 0.12396363636363636,
+          "total_attacks": 55000,
+          "successful_attacks": 6818,
+          "knowledge_ratio": 1.0,
+          "k_neighbors": 1,
+          "n_known_features": 5,
+          "n_total_features": 5,
+          "avg_distance_to_neighbors": 0.5365396109034849,
+          "attack_type": "knn_k1_knowledge1.0"
+        },
+        {
+          "success_rate": 0.06665454545454545,
+          "total_attacks": 55000,
+          "successful_attacks": 3666,
+          "knowledge_ratio": 1.0,
+          "k_neighbors": 3,
+          "n_known_features": 5,
+          "n_total_features": 5,
+          "avg_distance_to_neighbors": 0.6237514184066086,
+          "attack_type": "knn_k3_knowledge1.0"
+        },
+        {
+          "success_rate": 0.1556,
+          "total_attacks": 55000,
+          "successful_attacks": 8558,
+          "knowledge_ratio": 1.0,
+          "k_neighbors": 5,
+          "n_known_features": 5,
+          "n_total_features": 5,
+          "avg_distance_to_neighbors": 0.6889798796414044,
+          "attack_type": "knn_k5_knowledge1.0"
+        },
+        {
+          "success_rate": 0.1628181818181818,
+          "total_attacks": 55000,
+          "successful_attacks": 8955,
+          "knowledge_ratio": 1.0,
+          "k_neighbors": 10,
+          "n_known_features": 5,
+          "n_total_features": 5,
+          "avg_distance_to_neighbors": 0.7868610801730987,
+          "attack_type": "knn_k10_knowledge1.0"
+        },
+        {
+          "success_rate": 0.19932727272727271,
+          "total_attacks": 55000,
+          "successful_attacks": 10963,
+          "knowledge_ratio": 1.0,
+          "k_neighbors": 100,
+          "n_known_features": 5,
+          "n_total_features": 5,
+          "avg_distance_to_neighbors": 1.2037376346035817,
+          "attack_type": "knn_k100_knowledge1.0"
+        }
+      ],
+      "ml_attacks": [
+        {
+          "success_rate": 0.1882181818181818,
+          "cv_score_mean": 0.3641314017028847,
+          "cv_score_std": 0.016326965314914805,
+          "training_samples": 3658,
+          "test_samples": 55000,
+          "knowledge_ratio": 1.0,
+          "n_known_features": 5,
+          "n_total_features": 5,
+          "unique_train_labels": 405,
+          "unique_test_labels": 344,
+          "labels_overlap": 344,
+          "total_unique_labels": 405,
+          "attack_type": "ml_knowledge1.0"
+        }
+      ]
+    }
+  },
+  "summary": {
+    "max_success_rates": {
+      "inpatient_diagnosis_diagnosis": 0.014072727272727273,
+      "inpatient_procedures_procedure_code": 0.19932727272727271
+    },
+    "avg_success_rates": {
+      "inpatient_diagnosis_diagnosis": 0.006415151515151515,
+      "inpatient_procedures_procedure_code": 0.149430303030303
+    },
+    "vulnerability_assessment": {
+      "inpatient_diagnosis_diagnosis": {
+        "risk_level": "MINIMAL",
+        "max_success_rate": 0.014072727272727273,
+        "interpretation": "Minimal privacy risk (success rate: 1.4%). Inference attacks largely unsuccessful."
+      },
+      "inpatient_procedures_procedure_code": {
+        "risk_level": "MINIMAL",
+        "max_success_rate": 0.19932727272727271,
+        "interpretation": "Minimal privacy risk (success rate: 19.9%). Inference attacks largely unsuccessful."
+      }
+    }
+  },
+  "timestamp": "2025-05-28T22:49:01.519446"
+}
