@@ -14,6 +14,7 @@ import sys
 import logging
 import numpy as np
 import pandas as pd
+from sklearn.calibration import LabelEncoder
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
 from sklearn.compose import make_column_transformer
@@ -54,20 +55,24 @@ class MembershipInferenceAttack:
         Path('logs').mkdir(exist_ok=True)
         
     def prepare_attack_data(self, 
-                           training_data: pd.DataFrame,
-                           holdout_data: pd.DataFrame, 
-                           synthetic_data: pd.DataFrame,
-                           feature_columns: List[str],
-                           sample_size: int = 10000) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, np.ndarray]:
+                        training_data: pd.DataFrame,
+                        holdout_data: pd.DataFrame, 
+                        synthetic_data: pd.DataFrame,
+                        feature_columns: List[str],
+                        target_sample_per_set: int = 40000,
+                        synthetic_multiplier: float = 1.5,
+                        dataset_specific_limit: Optional[int] = None) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, np.ndarray]:
         """
-        Prepare data for membership inference attack.
+        Prepare data for membership inference attack with balanced sampling.
         
         Args:
             training_data: Data used to train the synthetic model (members)
             holdout_data: Data NOT used to train the synthetic model (non-members)
             synthetic_data: Synthetic dataset generated from training_data
             feature_columns: Columns to use for distance calculation
-            sample_size: Maximum number of records to use from each dataset
+            target_sample_per_set: Target sample size for each of training and holdout sets
+            synthetic_multiplier: Multiplier for synthetic dataset size relative to total target size
+            dataset_specific_limit: Optional override for synthetic sample size limit
             
         Returns:
             Tuple of (processed_training, processed_holdout, processed_synthetic, membership_labels)
@@ -84,47 +89,124 @@ class MembershipInferenceAttack:
         if missing_features:
             raise ValueError(f"Missing feature columns in datasets: {missing_features}")
         
-        # Sample data to manageable size
-        if len(training_data) > sample_size:
-            training_sample = training_data.sample(n=sample_size, random_state=42)
-        else:
-            training_sample = training_data.copy()
-            
-        if len(holdout_data) > sample_size:
-            holdout_sample = holdout_data.sample(n=sample_size, random_state=42)
-        else:
-            holdout_sample = holdout_data.copy()
-            
-        if len(synthetic_data) > sample_size * 2:  # Allow larger synthetic dataset
-            synthetic_sample = synthetic_data.sample(n=sample_size * 2, random_state=42)
-        else:
-            synthetic_sample = synthetic_data.copy()
+        # Define placeholder values to filter out
+        placeholder_values = [
+            "UNKNOWN", "00000000", "0000", "01.01.2510", "2510-01-01", 
+            "UUU", "NULL", "NaN", "", "NA", "MISSING", "-999"
+        ]
         
-        # Select feature columns
-        training_features = training_sample[feature_columns].copy()
-        holdout_features = holdout_sample[feature_columns].copy()
-        synthetic_features = synthetic_sample[feature_columns].copy()
+        # Select only the feature columns we need
+        training_features = training_data[feature_columns].copy()
+        holdout_features = holdout_data[feature_columns].copy()
+        synthetic_features = synthetic_data[feature_columns].copy()
+        
+        # Original counts
+        original_training_count = len(training_features)
+        original_holdout_count = len(holdout_features)
+        original_synthetic_count = len(synthetic_features)
+        
+        logging.info(f"Original counts before filtering:")
+        logging.info(f"  Training: {original_training_count:,}")
+        logging.info(f"  Holdout: {original_holdout_count:,}")
+        logging.info(f"  Synthetic: {original_synthetic_count:,}")
+        
+        # Filter out records with placeholder values in any feature column
+        for dataset_name, dataset in [
+            ("training", training_features), 
+            ("holdout", holdout_features), 
+            ("synthetic", synthetic_features)
+        ]:
+            # Create a mask that starts with all True
+            valid_mask = pd.Series(True, index=dataset.index)
+            
+            # For each feature column, update the mask to exclude placeholder values
+            for col in feature_columns:
+                # Convert column to string for comparison
+                col_str = dataset[col].astype(str)
+                
+                # Update mask to exclude rows with placeholder values
+                for placeholder in placeholder_values:
+                    valid_mask = valid_mask & (col_str != placeholder)
+                    
+                # For date columns, also check for null values
+                if "date" in col.lower() or "from" in col.lower() or "to" in col.lower():
+                    valid_mask = valid_mask & dataset[col].notna()
+            
+            # Apply the filter and log results
+            filtered_count = valid_mask.sum()
+            removed_count = len(dataset) - filtered_count
+            
+            logging.info(f"Filtering {dataset_name}:")
+            logging.info(f"  Original: {len(dataset):,}")
+            logging.info(f"  After filtering: {filtered_count:,}")
+            logging.info(f"  Removed: {removed_count:,} ({(removed_count/len(dataset))*100:.1f}%)")
+            
+            # Apply the filter
+            if dataset_name == "training":
+                training_features = dataset[valid_mask].reset_index(drop=True)
+            elif dataset_name == "holdout":
+                holdout_features = dataset[valid_mask].reset_index(drop=True)
+            else:  # synthetic
+                synthetic_features = dataset[valid_mask].reset_index(drop=True)
+        
+        # Check if we have enough data after filtering
+        if len(training_features) == 0 or len(holdout_features) == 0 or len(synthetic_features) == 0:
+            raise ValueError("After filtering placeholder values, at least one dataset is empty. Cannot proceed with MIA.")
+        
+        # Determine the balanced sample size for training and holdout
+        balanced_size = min(
+            min(len(training_features), target_sample_per_set),
+            min(len(holdout_features), target_sample_per_set)
+        )
+        
+        # Sample the same number from each dataset for balance
+        training_sample = training_features.sample(n=balanced_size, random_state=42)
+        holdout_sample = holdout_features.sample(n=balanced_size, random_state=42)
+        
+        # Calculate synthetic sample size
+        total_target_size = balanced_size * 2  # Combined training + holdout
+        
+        if dataset_specific_limit is not None:
+            # Use dataset-specific limit if provided
+            synthetic_sample_size = min(
+                len(synthetic_features),
+                dataset_specific_limit
+            )
+        else:
+            # Otherwise calculate based on multiplier
+            synthetic_sample_size = min(
+                len(synthetic_features),
+                int(total_target_size * synthetic_multiplier)
+            )
+        
+        # Sample synthetic data
+        synthetic_sample = synthetic_features.sample(
+            n=synthetic_sample_size, random_state=42
+        )
         
         # Create membership labels (1 = member, 0 = non-member)
         membership_labels = np.concatenate([
-            np.ones(len(training_features)),   # Training data = members
-            np.zeros(len(holdout_features))    # Holdout data = non-members
+            np.ones(len(training_sample)),   # Training data = members
+            np.zeros(len(holdout_sample))    # Holdout data = non-members
         ])
         
-        logging.info(f"Attack data prepared:")
-        logging.info(f"  Members (training): {len(training_features):,}")
-        logging.info(f"  Non-members (holdout): {len(holdout_features):,}")
-        logging.info(f"  Synthetic auxiliary: {len(synthetic_features):,}")
+        logging.info(f"Final attack data after filtering and sampling:")
+        logging.info(f"  Balanced sample size: {balanced_size:,} per set")
+        logging.info(f"  Members (training): {len(training_sample):,}")
+        logging.info(f"  Non-members (holdout): {len(holdout_sample):,}")
+        logging.info(f"  Synthetic auxiliary: {len(synthetic_sample):,}")
+        logging.info(f"  Total target records: {len(membership_labels):,}")
         logging.info(f"  Feature dimensions: {len(feature_columns)}")
         
-        return training_features, holdout_features, synthetic_features, membership_labels
+        return training_sample, holdout_sample, synthetic_sample, membership_labels
     
     def preprocess_features(self, 
-                           training_features: pd.DataFrame,
-                           holdout_features: pd.DataFrame,
-                           synthetic_features: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+                        training_features: pd.DataFrame,
+                        holdout_features: pd.DataFrame,
+                        synthetic_features: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
-        Preprocess features for distance calculation using existing FeaturePreprocessor.
+        Preprocess features for distance calculation using a combination of 
+        timestamp conversion and label encoding.
         
         Args:
             training_features: Training data features
@@ -139,12 +221,75 @@ class MembershipInferenceAttack:
         # Combine all data for consistent preprocessing
         combined_target = pd.concat([training_features, holdout_features], ignore_index=True)
         
-        # Use FeaturePreprocessor to handle healthcare-specific encoding
-        processed_target, processed_synthetic, numeric_cols, string_cols = FeaturePreprocessor.preprocess_dataframes(
-            combined_target, synthetic_features
-        )
+        # Create copies to avoid modifying originals
+        processed_target = combined_target.copy()
+        processed_synthetic = synthetic_features.copy()
         
-        # Create transformer pipeline
+        # Identify column types
+        timestamp_cols = []
+        categorical_cols = []
+        numeric_cols = []
+        
+        for col in combined_target.columns:
+            col_lower = col.lower()
+            # Identify timestamp columns
+            if any(term in col_lower for term in ["date", "time", "from", "to"]):
+                timestamp_cols.append(col)
+            # Check if numeric
+            elif pd.api.types.is_numeric_dtype(combined_target[col]):
+                numeric_cols.append(col)
+            # Everything else is considered categorical
+            else:
+                categorical_cols.append(col)
+        
+        logging.info(f"Column types identified:")
+        logging.info(f"  Timestamps: {timestamp_cols}")
+        logging.info(f"  Numeric: {numeric_cols}")
+        logging.info(f"  Categorical: {categorical_cols}")
+        
+        # Process timestamp columns using FeaturePreprocessor
+        if timestamp_cols:
+            logging.info(f"Converting {len(timestamp_cols)} timestamp columns to epoch...")
+            # Convert timestamps in target data
+            processed_target, _ = FeaturePreprocessor.convert_timestamps_to_epoch(
+                processed_target, timestamp_cols, []
+            )
+            # Convert timestamps in synthetic data
+            processed_synthetic, _ = FeaturePreprocessor.convert_timestamps_to_epoch(
+                processed_synthetic, timestamp_cols, []
+            )
+            
+            # Add timestamp columns to numeric columns for further processing
+            numeric_cols.extend(timestamp_cols)
+        
+        # Process categorical columns with LabelEncoder
+        if categorical_cols:
+            logging.info(f"Encoding {len(categorical_cols)} categorical columns...")
+            for col in categorical_cols:
+                if col in processed_target.columns and col in processed_synthetic.columns:
+                    # Convert to string first to handle various types
+                    processed_target[col] = processed_target[col].astype(str)
+                    processed_synthetic[col] = processed_synthetic[col].astype(str)
+                    
+                    # Combine values from both datasets to ensure consistent encoding
+                    all_values = np.concatenate([
+                        processed_target[col].values, 
+                        processed_synthetic[col].values
+                    ])
+                    
+                    # Fit encoder on all values
+                    le = LabelEncoder()
+                    le.fit(all_values)
+                    
+                    # Transform each dataset separately
+                    processed_target[col] = le.transform(processed_target[col].values)
+                    processed_synthetic[col] = le.transform(processed_synthetic[col].values)
+                    
+                    # Add encoded categorical columns to numeric columns for scaling
+                    if col not in numeric_cols:
+                        numeric_cols.append(col)
+        
+        # Create transformer for numeric columns
         transformers = []
         if numeric_cols:
             transformers.append((
@@ -158,11 +303,13 @@ class MembershipInferenceAttack:
         if not transformers:
             raise ValueError("No valid numeric columns for distance calculation")
         
-        # Fit transformer on all data
+        # Fit transformer on combined target and synthetic data
+        combined_for_transform = pd.concat([processed_target, processed_synthetic], ignore_index=True)
         transformer = make_column_transformer(*transformers, remainder='drop')
+        transformer.fit(combined_for_transform)
         
-        # Transform all datasets
-        target_encoded = transformer.fit_transform(processed_target)
+        # Transform each dataset
+        target_encoded = transformer.transform(processed_target)
         synthetic_encoded = transformer.transform(processed_synthetic)
         
         # Split target data back into training and holdout
