@@ -1,0 +1,62 @@
+{
+  "attack_config": {
+    "distance_metric": "euclidean",
+    "optimization_metric": "f1",
+    "target_sample_per_set": 40000,
+    "synthetic_multiplier": 1.5,
+    "dataset_specific_limit": null,
+    "feature_columns": [
+      "insurants_year_of_birth",
+      "insurants_gender",
+      "insurance_data_regional_code",
+      "inpatient_cases_date_of_admission",
+      "inpatient_cases_department_admission",
+      "inpatient_diagnosis_diagnosis",
+      "inpatient_procedures_procedure_code"
+    ],
+    "n_features": 7
+  },
+  "dataset_info": {
+    "n_training_records": 40000,
+    "n_holdout_records": 40000,
+    "n_synthetic_records": 120000,
+    "total_target_records": 80000
+  },
+  "threshold_optimization": {
+    "best_threshold": 2.008234957704228,
+    "best_score": 0.6577181208053692,
+    "optimization_metric": "f1"
+  },
+  "attack_performance": {
+    "threshold": 2.008234957704228,
+    "accuracy": 0.49,
+    "precision": 0.494949494949495,
+    "recall": 0.98,
+    "f1_score": 0.6577181208053692,
+    "auc_roc": 0.48949497406250003,
+    "confusion_matrix": {
+      "true_positives": 39200,
+      "false_positives": 40000,
+      "true_negatives": 0,
+      "false_negatives": 800
+    },
+    "distance_statistics": {
+      "member_distances": {
+        "mean": 0.5847446346346146,
+        "std": 0.36391881187742703,
+        "min": 0.01857238498989444,
+        "max": 2.6428696564616043,
+        "median": 0.5495040337467656
+      },
+      "non_member_distances": {
+        "mean": 0.5343365198230419,
+        "std": 0.2923532247289754,
+        "min": 0.01857238498989444,
+        "max": 1.7659130935473293,
+        "median": 0.5492128184432148
+      }
+    }
+  },
+  "visualization_path": "results/mia_attacks\\mia_distances_20250529_150903.png",
+  "timestamp": "2025-05-29T15:09:04.439296"
+}
