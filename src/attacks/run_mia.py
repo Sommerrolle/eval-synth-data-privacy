@@ -4,11 +4,23 @@ Focused MIA test for membership inference attack evaluation
 """
 
 import os.path, sys
-sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), os.pardir))
+# sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), os.pardir))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import logging
 from mia import MembershipInferenceAttack
-from duckdb_manager import DuckDBManager
+from duckdb_manager.duckdb_manager import DuckDBManager
+
+# MIA sample configurations
+MIA_SAMPLE_CONFIGS = {
+    'target_sample_per_set': 40000,  # 40k each for training & holdout (80k total target data)
+    'synthetic_multiplier': 1.5,     # Synthetic dataset will be 1.5x the total target data
+    'dataset_specific_limits': {
+        'limebit_mtgan': 30000,      # Smaller due to dataset limitations
+        'limebit_bn': 25000,         # Smaller due to dataset limitations
+        'cprd_bn': 20000             # Smallest due to dataset limitations
+    }
+}
 
 def test_membership_inference():
     """
@@ -38,6 +50,13 @@ def test_membership_inference():
         "inpatient_procedures_procedure_code"
     ]
     
+    # Determine dataset-specific limit based on synthetic DB name
+    dataset_specific_limit = None
+    for db_name, limit in MIA_SAMPLE_CONFIGS['dataset_specific_limits'].items():
+        if db_name in SYNTHETIC_DB:
+            dataset_specific_limit = limit
+            break
+    
     print("="*80)
     print("FOCUSED MIA TEST: Membership Inference Attack")
     print("="*80)
@@ -45,6 +64,10 @@ def test_membership_inference():
     print(f"Synthetic Database: {SYNTHETIC_DB}")
     print(f"Table: {TABLE_NAME}")
     print(f"Feature Columns: {len(feature_columns)}")
+    print(f"Target Sample Per Set: {MIA_SAMPLE_CONFIGS['target_sample_per_set']:,}")
+    print(f"Synthetic Multiplier: {MIA_SAMPLE_CONFIGS['synthetic_multiplier']}")
+    if dataset_specific_limit:
+        print(f"Dataset-Specific Limit: {dataset_specific_limit:,}")
     print("="*80)
     
     # Load data
@@ -111,9 +134,9 @@ def test_membership_inference():
             holdout_data=holdout_data, 
             synthetic_data=synthetic_data,
             feature_columns=feature_columns,
-            sample_size=50000,  # Reasonable sample for testing
-            distance_metric='euclidean',
-            optimization_metric='f1'
+            target_sample_per_set=MIA_SAMPLE_CONFIGS['target_sample_per_set'],
+            synthetic_multiplier=MIA_SAMPLE_CONFIGS['synthetic_multiplier'],
+            dataset_specific_limit=dataset_specific_limit
         )
         
         # Display results
@@ -316,15 +339,23 @@ def test_multiple_synthetic_datasets():
                 print(f"ERROR: Missing columns in {synthetic_db}: {missing_synth}")
                 continue
             
+            # Determine dataset-specific limit
+            dataset_specific_limit = None
+            for db_name, limit in MIA_SAMPLE_CONFIGS['dataset_specific_limits'].items():
+                if db_name in synthetic_db:
+                    dataset_specific_limit = limit
+                    print(f"Using dataset-specific limit: {limit:,}")
+                    break
+            
             # Run MIA evaluation
             results = mia_evaluator.run_membership_inference_attack(
                 training_data=training_data,
                 holdout_data=holdout_data,
                 synthetic_data=synthetic_data,
                 feature_columns=feature_columns,
-                sample_size=25000,  # Smaller sample for multiple tests
-                distance_metric='euclidean',
-                optimization_metric='f1'
+                target_sample_per_set=MIA_SAMPLE_CONFIGS['target_sample_per_set'],
+                synthetic_multiplier=MIA_SAMPLE_CONFIGS['synthetic_multiplier'],
+                dataset_specific_limit=dataset_specific_limit
             )
             
             # Extract key metrics

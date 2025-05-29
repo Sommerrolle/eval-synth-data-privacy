@@ -26,9 +26,11 @@ from typing import List, Dict, Tuple, Optional
 import json
 from datetime import datetime
 from pathlib import Path
+import os.path, sys
 
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), os.pardir))
 # Import existing modules (adjust paths as needed)
-from duckdb_manager import DuckDBManager
+from duckdb_manager.duckdb_manager import DuckDBManager
 from feature_preprocessing import FeaturePreprocessor
 
 # Configure logging
