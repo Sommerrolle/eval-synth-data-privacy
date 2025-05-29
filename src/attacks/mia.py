@@ -429,7 +429,7 @@ class MembershipInferenceAttack:
             'best_threshold': best_threshold,
             'best_score': best_score,
             'optimization_metric': metric,
-            'all_results': threshold_results
+            # 'all_results': threshold_results
         }
         
         logging.info(f"Threshold optimization complete:")

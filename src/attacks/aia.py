@@ -68,6 +68,7 @@ class AttributeInferenceAttack:
         
         return orig_subset, synth_subset, quasi_identifiers, sensitive_attributes
 
+
     def sample_overlapping_data(self, original_df: pd.DataFrame, synthetic_df: pd.DataFrame, 
                             sensitive_attribute: str, synthetic_sample_size: int = 5000, 
                             strategy: str = 'random') -> Tuple[pd.DataFrame, pd.DataFrame, Dict]:
@@ -613,7 +614,7 @@ class AttributeInferenceAttack:
         # knowledge_ratios = [0.3, 0.5, 0.7, 0.9]
         # k_values = [3, 5, 10]
         knowledge_ratios = [1.0]
-        k_values = [1,3,5,10, 100]
+        k_values = [1, 10, 100]
         
         for sensitive_attr in sens_attrs:
             if sensitive_attr not in orig_df.columns or sensitive_attr not in synth_df.columns:

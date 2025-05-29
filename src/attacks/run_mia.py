@@ -35,8 +35,8 @@ def test_membership_inference():
     mia_evaluator = MembershipInferenceAttack()
     
     # Configuration for focused test
-    ORIGINAL_DB = "claims_data.duckdb"  # Your original database
-    SYNTHETIC_DB = "cle_test.duckdb"  # Test with one synthetic database first
+    ORIGINAL_DB = "cle_test.duckdb"  # Your original database
+    SYNTHETIC_DB = "limebit_bn.duckdb"  # Test with one synthetic database first
     TABLE_NAME = "clean_join_2017_inpatient"  # Focus on comprehensive inpatient table
     
     # Your specified quasi-identifiers and features for MIA
