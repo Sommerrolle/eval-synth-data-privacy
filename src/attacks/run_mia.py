@@ -157,6 +157,9 @@ def test_membership_inference():
         print(f"\nAttack Configuration:")
         print(f"  Distance metric: {config['distance_metric']}")
         print(f"  Optimization metric: {config['optimization_metric']}")
+        print(f"  Target sample per set: {config['target_sample_per_set']:,}")
+        print(f"  Synthetic multiplier: {config['synthetic_multiplier']}")
+        print(f"  Dataset specific limit: {config['dataset_specific_limit']}")
         print(f"  Features used: {config['n_features']}")
         
         print(f"\nAttack Performance:")

@@ -608,7 +608,9 @@ class MembershipInferenceAttack:
                                       holdout_data: pd.DataFrame,
                                       synthetic_data: pd.DataFrame,
                                       feature_columns: List[str],
-                                      sample_size: int = 10000,
+                                      target_sample_per_set: int = 40000,
+                                      synthetic_multiplier: float = 1.5,
+                                      dataset_specific_limit: Optional[int] = None,
                                       distance_metric: str = 'euclidean',
                                       optimization_metric: str = 'f1') -> Dict:
         """
@@ -619,7 +621,9 @@ class MembershipInferenceAttack:
             holdout_data: Data not used to train synthetic model (non-members)
             synthetic_data: Synthetic dataset
             feature_columns: Features to use for distance calculation
-            sample_size: Maximum records per dataset
+            target_sample_per_set: Target sample size for each of training and holdout sets
+            synthetic_multiplier: Multiplier for synthetic dataset size relative to total target size
+            dataset_specific_limit: Optional override for synthetic sample size limit
             distance_metric: Distance metric for k-NN
             optimization_metric: Metric to optimize threshold selection
             
@@ -630,7 +634,8 @@ class MembershipInferenceAttack:
         
         # Prepare data
         training_features, holdout_features, synthetic_features, membership_labels = self.prepare_attack_data(
-            training_data, holdout_data, synthetic_data, feature_columns, sample_size
+            training_data, holdout_data, synthetic_data, feature_columns, 
+            target_sample_per_set, synthetic_multiplier, dataset_specific_limit
         )
         
         # Preprocess features
@@ -662,7 +667,9 @@ class MembershipInferenceAttack:
             'attack_config': {
                 'distance_metric': distance_metric,
                 'optimization_metric': optimization_metric,
-                'sample_size': sample_size,
+                'target_sample_per_set': target_sample_per_set,
+                'synthetic_multiplier': synthetic_multiplier,
+                'dataset_specific_limit': dataset_specific_limit,
                 'feature_columns': feature_columns,
                 'n_features': len(feature_columns)
             },
@@ -722,7 +729,9 @@ def main():
     parser.add_argument('--synthetic_db', required=True, help='Synthetic database')
     parser.add_argument('--table', required=True, help='Table name to analyze')
     parser.add_argument('--training_table', help='Training table name (if different from --table)')
-    parser.add_argument('--sample_size', type=int, default=10000, help='Sample size per dataset')
+    parser.add_argument('--target_sample_per_set', type=int, default=40000, help='Target sample size per dataset')
+    parser.add_argument('--synthetic_multiplier', type=float, default=1.5, help='Synthetic dataset size multiplier')
+    parser.add_argument('--dataset_specific_limit', type=int, help='Dataset-specific limit for synthetic sample size')
     parser.add_argument('--results_dir', default='results/mia_attacks', help='Results directory')
     
     args = parser.parse_args()
@@ -791,7 +800,9 @@ def main():
             holdout_data=holdout_data,
             synthetic_data=synthetic_data,
             feature_columns=feature_columns,
-            sample_size=args.sample_size
+            target_sample_per_set=args.target_sample_per_set,
+            synthetic_multiplier=args.synthetic_multiplier,
+            dataset_specific_limit=args.dataset_specific_limit
         )
         
         # Display results
