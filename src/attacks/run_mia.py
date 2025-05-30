@@ -34,9 +34,10 @@ def test_membership_inference():
     db_manager = DuckDBManager()
     mia_evaluator = MembershipInferenceAttack()
     
-    # Configuration for focused test
-    ORIGINAL_DB = "cle_test.duckdb"  # Your original database
-    SYNTHETIC_DB = "limebit_bn.duckdb"  # Test with one synthetic database first
+    # Configuration for focused test - using separate databases
+    TRAINING_DB = "claims_data.duckdb"      # Training database (members)
+    HOLDOUT_DB = "cle_test.duckdb"         # Holdout database (non-members)  
+    SYNTHETIC_DB = "limebit_mtgan.duckdb"     # Synthetic database
     TABLE_NAME = "clean_join_2017_inpatient"  # Focus on comprehensive inpatient table
     
     # Your specified quasi-identifiers and features for MIA
@@ -60,7 +61,8 @@ def test_membership_inference():
     print("="*80)
     print("FOCUSED MIA TEST: Membership Inference Attack")
     print("="*80)
-    print(f"Original Database: {ORIGINAL_DB}")
+    print(f"Training Database (members): {TRAINING_DB}")
+    print(f"Holdout Database (non-members): {HOLDOUT_DB}")
     print(f"Synthetic Database: {SYNTHETIC_DB}")
     print(f"Table: {TABLE_NAME}")
     print(f"Feature Columns: {len(feature_columns)}")
@@ -70,62 +72,50 @@ def test_membership_inference():
         print(f"Dataset-Specific Limit: {dataset_specific_limit:,}")
     print("="*80)
     
-    # Load data
+    # Load data from separate databases
     try:
-        orig_path = db_manager.get_database_path(ORIGINAL_DB)
+        training_path = db_manager.get_database_path(TRAINING_DB)
+        holdout_path = db_manager.get_database_path(HOLDOUT_DB)
         synth_path = db_manager.get_database_path(SYNTHETIC_DB)
         
-        original_data = db_manager.load_table_data(orig_path, TABLE_NAME)
+        training_data = db_manager.load_table_data(training_path, TABLE_NAME)
+        holdout_data = db_manager.load_table_data(holdout_path, TABLE_NAME)
         synthetic_data = db_manager.load_table_data(synth_path, TABLE_NAME)
         
-        print(f"Original data shape: {original_data.shape}")
+        print(f"Training data shape: {training_data.shape}")
+        print(f"Holdout data shape: {holdout_data.shape}")
         print(f"Synthetic data shape: {synthetic_data.shape}")
         
-        # Check if required columns exist  
-        missing_orig = [col for col in feature_columns 
-                       if col not in original_data.columns]
+        # Check if required columns exist in all databases
+        missing_training = [col for col in feature_columns 
+                           if col not in training_data.columns]
+        missing_holdout = [col for col in feature_columns 
+                          if col not in holdout_data.columns]
         missing_synth = [col for col in feature_columns 
                         if col not in synthetic_data.columns]
         
-        if missing_orig or missing_synth:
-            print(f"ERROR: Missing columns in original: {missing_orig}")
+        if missing_training or missing_holdout or missing_synth:
+            print(f"ERROR: Missing columns in training: {missing_training}")
+            print(f"ERROR: Missing columns in holdout: {missing_holdout}")
             print(f"ERROR: Missing columns in synthetic: {missing_synth}")
             return
         
-        # Split original data into training (members) and holdout (non-members)
-        # Simulate the scenario where synthetic model was trained on part of the data
-        
-        # Use a deterministic split based on patient ID to ensure consistency
-        # Sort by pid first to make split deterministic
-        original_sorted = original_data.sort_values('pid').reset_index(drop=True)
-        
-        # Get unique patient IDs
-        unique_pids = original_sorted['pid'].unique()
-        n_patients = len(unique_pids)
-        
-        # Split patients 80/20 for training/holdout
-        train_patients = int(0.8 * n_patients)
-        training_pids = set(unique_pids[:train_patients])
-        holdout_pids = set(unique_pids[train_patients:])
-        
-        # Create training and holdout datasets based on patient splits
-        training_data = original_sorted[original_sorted['pid'].isin(training_pids)].copy()
-        holdout_data = original_sorted[original_sorted['pid'].isin(holdout_pids)].copy()
-        
-        print(f"\nDataset split (by patients):")
-        print(f"  Total patients: {n_patients:,}")
-        print(f"  Training patients: {len(training_pids):,}")
-        print(f"  Holdout patients: {len(holdout_pids):,}")
+        print(f"\nDataset information:")
         print(f"  Training records (members): {len(training_data):,}")
         print(f"  Holdout records (non-members): {len(holdout_data):,}")
         print(f"  Synthetic records: {len(synthetic_data):,}")
         
-        # Verify no patient overlap between training and holdout
-        overlap_patients = training_pids & holdout_pids
-        if overlap_patients:
-            print(f"WARNING: Patient overlap detected: {len(overlap_patients)} patients")
-        else:
-            print("✓ No patient overlap between training and holdout sets")
+        # Optional: Check for patient overlap between training and holdout
+        if 'pid' in training_data.columns and 'pid' in holdout_data.columns:
+            training_pids = set(training_data['pid'].unique())
+            holdout_pids = set(holdout_data['pid'].unique())
+            overlap_patients = training_pids & holdout_pids
+            
+            if overlap_patients:
+                print(f"WARNING: Patient overlap detected: {len(overlap_patients)} patients")
+                print("  This could affect the validity of the membership inference attack!")
+            else:
+                print("✓ No patient overlap between training and holdout sets")
         
         # Run MIA evaluation
         print(f"\nRunning MIA evaluation...")
@@ -235,7 +225,7 @@ def test_membership_inference():
         # Save results
         output_file = mia_evaluator.save_results(
             results, 
-            ORIGINAL_DB.replace('.duckdb', ''), 
+            f"{TRAINING_DB.replace('.duckdb', '')}_vs_{HOLDOUT_DB.replace('.duckdb', '')}", 
             SYNTHETIC_DB.replace('.duckdb', ''), 
             TABLE_NAME
         )
@@ -280,8 +270,9 @@ def test_multiple_synthetic_datasets():
     db_manager = DuckDBManager()
     mia_evaluator = MembershipInferenceAttack()
     
-    # Configuration
-    ORIGINAL_DB = "claims_data.duckdb"
+    # Configuration - using separate training and holdout databases
+    TRAINING_DB = "claims_data.duckdb"      # Training database (members)
+    HOLDOUT_DB = "cle_test.duckdb"         # Holdout database (non-members)
     SYNTHETIC_DBS = [
         "ai4medicine_arf.duckdb",
         "ai4medicine_gan.duckdb", 
@@ -289,7 +280,7 @@ def test_multiple_synthetic_datasets():
         "limebit_bn.duckdb",
         "limebit_mtgan.duckdb"
     ]
-    TABLE_NAME = "all_inpatient"
+    TABLE_NAME = "clean_join_2017_inpatient"  # Updated to use specific year table
     
     feature_columns = [
         "insurants_year_of_birth",
@@ -304,21 +295,31 @@ def test_multiple_synthetic_datasets():
     print("="*80)
     print("COMPARATIVE MIA TEST: Multiple Synthetic Datasets")
     print("="*80)
+    print(f"Training Database (members): {TRAINING_DB}")
+    print(f"Holdout Database (non-members): {HOLDOUT_DB}")
+    print(f"Table: {TABLE_NAME}")
+    print("="*80)
     
-    # Load original data once
-    orig_path = db_manager.get_database_path(ORIGINAL_DB)
-    original_data = db_manager.load_table_data(orig_path, TABLE_NAME)
+    # Load training and holdout data once
+    training_path = db_manager.get_database_path(TRAINING_DB)
+    holdout_path = db_manager.get_database_path(HOLDOUT_DB)
     
-    # Create training/holdout split
-    original_sorted = original_data.sort_values('pid').reset_index(drop=True)
-    unique_pids = original_sorted['pid'].unique()
-    n_patients = len(unique_pids)
-    train_patients = int(0.8 * n_patients)
-    training_pids = set(unique_pids[:train_patients])
-    holdout_pids = set(unique_pids[train_patients:])
+    training_data = db_manager.load_table_data(training_path, TABLE_NAME)
+    holdout_data = db_manager.load_table_data(holdout_path, TABLE_NAME)
     
-    training_data = original_sorted[original_sorted['pid'].isin(training_pids)].copy()
-    holdout_data = original_sorted[original_sorted['pid'].isin(holdout_pids)].copy()
+    print(f"Training data shape: {training_data.shape}")
+    print(f"Holdout data shape: {holdout_data.shape}")
+    
+    # Check for patient overlap
+    if 'pid' in training_data.columns and 'pid' in holdout_data.columns:
+        training_pids = set(training_data['pid'].unique())
+        holdout_pids = set(holdout_data['pid'].unique())
+        overlap_patients = training_pids & holdout_pids
+        
+        if overlap_patients:
+            print(f"WARNING: Patient overlap detected: {len(overlap_patients)} patients")
+        else:
+            print("✓ No patient overlap between training and holdout sets")
     
     results_summary = []
     
@@ -381,7 +382,7 @@ def test_multiple_synthetic_datasets():
             # Save individual results
             output_file = mia_evaluator.save_results(
                 results, 
-                ORIGINAL_DB.replace('.duckdb', ''), 
+                f"{TRAINING_DB.replace('.duckdb', '')}_vs_{HOLDOUT_DB.replace('.duckdb', '')}", 
                 synthetic_db.replace('.duckdb', ''), 
                 TABLE_NAME
             )

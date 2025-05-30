@@ -23,40 +23,40 @@
     "total_target_records": 80000
   },
   "threshold_optimization": {
-    "best_threshold": 2.0004003653766382,
-    "best_score": 0.657986577181208,
+    "best_threshold": 1.7302997105770825,
+    "best_score": 0.6697466216216216,
     "optimization_metric": "f1"
   },
   "attack_performance": {
-    "threshold": 2.0004003653766382,
-    "accuracy": 0.4904,
-    "precision": 0.4951515151515152,
-    "recall": 0.9804,
-    "f1_score": 0.657986577181208,
-    "auc_roc": 0.51257011875,
+    "threshold": 1.7302997105770825,
+    "accuracy": 0.511225,
+    "precision": 0.5057270408163266,
+    "recall": 0.991225,
+    "f1_score": 0.6697466216216216,
+    "auc_roc": 0.528287321875,
     "confusion_matrix": {
-      "true_positives": 39216,
-      "false_positives": 39984,
-      "true_negatives": 16,
-      "false_negatives": 784
+      "true_positives": 39649,
+      "false_positives": 38751,
+      "true_negatives": 1249,
+      "false_negatives": 351
     },
     "distance_statistics": {
       "member_distances": {
-        "mean": 0.8789846361834356,
-        "std": 0.3996877802843144,
-        "min": 0.016047773217331387,
-        "max": 2.856467723828197,
-        "median": 0.7864801838543196
+        "mean": 0.8374690019086359,
+        "std": 0.3398222657139973,
+        "min": 0.07473278776052639,
+        "max": 2.629486485090423,
+        "median": 0.7706168259334707
       },
       "non_member_distances": {
-        "mean": 0.8770207876469321,
-        "std": 0.3447417564818947,
-        "min": 0.021953772886984524,
-        "max": 2.2170974917483153,
-        "median": 0.8405023981420436
+        "mean": 0.889958033761772,
+        "std": 0.4014879079094423,
+        "min": 0.03712182288539553,
+        "max": 2.8664175131613994,
+        "median": 0.7878595402913335
       }
     }
   },
-  "visualization_path": "results/mia_attacks\\mia_distances_20250529_160052.png",
-  "timestamp": "2025-05-29T16:00:53.277777"
+  "visualization_path": "results/mia_attacks\\mia_distances_20250530_151124.png",
+  "timestamp": "2025-05-30T15:11:25.251992"
 }
