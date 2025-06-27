@@ -1,0 +1,10 @@
+{
+  "dcr": {
+    "synthetic_to_original_p5": 0.0,
+    "within_original_p5": 0.0
+  },
+  "nndr": {
+    "synthetic_to_original_p5": 0.0,
+    "within_original_p5": 0.5
+  }
+}

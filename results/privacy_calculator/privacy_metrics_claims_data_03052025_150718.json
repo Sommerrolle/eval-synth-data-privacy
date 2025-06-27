@@ -1,0 +1,90 @@
+{
+  "database": "claims_data.duckdb",
+  "sample_size_requested": 10000,
+  "analyses": [
+    {
+      "table_name": "all_drugs",
+      "quasi_identifiers": [
+        "insurants_year_of_birth",
+        "insurants_gender",
+        "insurance_data_regional_code",
+        "drugs_date_of_prescription",
+        "drugs_date_of_dispense"
+      ],
+      "sensitive_attributes": [
+        "inpatient_diagnosis_diagnosis",
+        "inpatient_procedures_procedure_code",
+        "outpatient_diagnosis_diagnosis",
+        "outpatient_procedures_procedure_code",
+        "drugs_pharma_central_number",
+        "drugs_specialty_of_prescriber",
+        "drugs_atc"
+      ],
+      "sample_size_used": 9998,
+      "total_table_size": 1268824,
+      "results": {
+        "error": "Missing, empty dataset, or invalid quasi-identifiers",
+        "l_diversity": {},
+        "t_closeness": {}
+      },
+      "timestamp": "2025-05-03T15:07:15.156669"
+    },
+    {
+      "table_name": "all_inpatient",
+      "quasi_identifiers": [
+        "insurants_year_of_birth",
+        "insurants_gender",
+        "insurance_data_regional_code",
+        "inpatient_cases_date_of_admission",
+        "inpatient_cases_department_admission"
+      ],
+      "sensitive_attributes": [
+        "inpatient_diagnosis_diagnosis",
+        "inpatient_procedures_procedure_code",
+        "outpatient_diagnosis_diagnosis",
+        "outpatient_procedures_procedure_code",
+        "drugs_pharma_central_number",
+        "drugs_specialty_of_prescriber",
+        "drugs_atc"
+      ],
+      "sample_size_used": 9667,
+      "total_table_size": 42031079,
+      "results": {
+        "error": "Missing, empty dataset, or invalid quasi-identifiers",
+        "l_diversity": {},
+        "t_closeness": {}
+      },
+      "timestamp": "2025-05-03T15:07:16.651877"
+    },
+    {
+      "table_name": "all_outpatient",
+      "quasi_identifiers": [
+        "insurants_year_of_birth",
+        "insurants_gender",
+        "insurance_data_regional_code",
+        "outpatient_cases_from",
+        "outpatient_cases_to",
+        "outpatient_cases_practice_code",
+        "outpatient_cases_year",
+        "outpatient_cases_quarter"
+      ],
+      "sensitive_attributes": [
+        "inpatient_diagnosis_diagnosis",
+        "inpatient_procedures_procedure_code",
+        "outpatient_diagnosis_diagnosis",
+        "outpatient_procedures_procedure_code",
+        "drugs_pharma_central_number",
+        "drugs_specialty_of_prescriber",
+        "drugs_atc"
+      ],
+      "sample_size_used": 9656,
+      "total_table_size": 38624638,
+      "results": {
+        "error": "Missing, empty dataset, or invalid quasi-identifiers",
+        "l_diversity": {},
+        "t_closeness": {}
+      },
+      "timestamp": "2025-05-03T15:07:18.254955"
+    }
+  ]
+}

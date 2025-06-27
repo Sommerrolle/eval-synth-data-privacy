@@ -1,0 +1,84 @@
+{
+  "database": "claims_data.duckdb",
+  "sample_size_requested": 10000,
+  "analyses": [
+    {
+      "table_name": "all_drugs",
+      "quasi_identifiers": [
+        "insurants_year_of_birth",
+        "insurants_gender",
+        "insurance_data_regional_code",
+        "drugs_date_of_prescription",
+        "drugs_date_of_dispense"
+      ],
+      "sensitive_attributes": [
+        "inpatient_diagnosis_diagnosis",
+        "inpatient_procedures_procedure_code",
+        "outpatient_diagnosis_diagnosis",
+        "outpatient_procedures_procedure_code",
+        "drugs_pharma_central_number",
+        "drugs_specialty_of_prescriber",
+        "drugs_atc"
+      ],
+      "results": {
+        "error": "Missing, empty dataset, or invalid quasi-identifiers",
+        "l_diversity": {},
+        "t_closeness": {}
+      },
+      "timestamp": "2025-05-03T15:26:17.853343"
+    },
+    {
+      "table_name": "all_inpatient",
+      "quasi_identifiers": [
+        "insurants_year_of_birth",
+        "insurants_gender",
+        "insurance_data_regional_code",
+        "inpatient_cases_date_of_admission",
+        "inpatient_cases_department_admission"
+      ],
+      "sensitive_attributes": [
+        "inpatient_diagnosis_diagnosis",
+        "inpatient_procedures_procedure_code",
+        "outpatient_diagnosis_diagnosis",
+        "outpatient_procedures_procedure_code",
+        "drugs_pharma_central_number",
+        "drugs_specialty_of_prescriber",
+        "drugs_atc"
+      ],
+      "results": {
+        "error": "Missing, empty dataset, or invalid quasi-identifiers",
+        "l_diversity": {},
+        "t_closeness": {}
+      },
+      "timestamp": "2025-05-03T15:26:19.336923"
+    },
+    {
+      "table_name": "all_outpatient",
+      "quasi_identifiers": [
+        "insurants_year_of_birth",
+        "insurants_gender",
+        "insurance_data_regional_code",
+        "outpatient_cases_from",
+        "outpatient_cases_to",
+        "outpatient_cases_practice_code",
+        "outpatient_cases_year",
+        "outpatient_cases_quarter"
+      ],
+      "sensitive_attributes": [
+        "inpatient_diagnosis_diagnosis",
+        "inpatient_procedures_procedure_code",
+        "outpatient_diagnosis_diagnosis",
+        "outpatient_procedures_procedure_code",
+        "drugs_pharma_central_number",
+        "drugs_specialty_of_prescriber",
+        "drugs_atc"
+      ],
+      "results": {
+        "error": "Missing, empty dataset, or invalid quasi-identifiers",
+        "l_diversity": {},
+        "t_closeness": {}
+      },
+      "timestamp": "2025-05-03T15:26:20.977497"
+    }
+  ]
+}
