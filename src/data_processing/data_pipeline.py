@@ -58,12 +58,12 @@ class ProcessingPipeline:
         if not os.path.exists(db_path):
             raise FileNotFoundError(f"Database file not found: {db_path}")
         
-        # Define scripts with absolute paths
+        # Define scripts with relative paths (now in same directory)
         self.scripts = {
-            "preprocess": str(SCRIPT_DIR / "preprocessing_before_join.py"),
-            "join": str(SCRIPT_DIR / "join_by_year_with_stats.py"),
-            "postprocess": str(SCRIPT_DIR / "preprocess_joined_tables.py"),
-            "combine": str(SCRIPT_DIR / "combine_yearly_joins.py")
+            "preprocess": "preprocessing_before_join.py",
+            "join": "join_by_year_with_stats.py",
+            "postprocess": "preprocess_joined_tables.py",
+            "combine": "combine_yearly_joins.py"
         }
         
         # Verify that all required scripts exist
@@ -114,7 +114,8 @@ class ProcessingPipeline:
                 check=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                text=True
+                text=True,
+                cwd=SCRIPT_DIR  # Run from the script directory
             )
             
             # Log and print stdout
@@ -310,8 +311,8 @@ class ProcessingPipeline:
         
         successful_years = []
         for year in self.years:
-            join_status = "✅ Success" if results["join_by_year"].get(year, False) else "❌ Failed"
-            preprocess_status = "✅ Success" if results["preprocess_joined"].get(year, False) else "❌ Failed"
+            join_status = "✅ Success" if results["join_by_year"].get(year, False) else " Failed"
+            preprocess_status = "✅ Success" if results["preprocess_joined"].get(year, False) else " Failed"
             print(f"{year:<10} {join_status:<20} {preprocess_status:<20}")
             
             if results["preprocess_joined"].get(year, False):
@@ -321,7 +322,7 @@ class ProcessingPipeline:
         
         # Step 4 summary
         if "combine_yearly" in results:
-            status = "✅ Success" if results["combine_yearly"] else "❌ Failed"
+            status = "✅ Success" if results["combine_yearly"] else " Failed"
             print(f"\nStep 4: Combining Year-Specific Tables ({', '.join(map(str, successful_years))}) - {status}")
 
 def parse_arguments():
@@ -341,7 +342,25 @@ def parse_arguments():
     return parser.parse_args()
 
 def main():
-    """Main function to run the pipeline."""
+    """
+    Main function to run the health claims data processing pipeline.
+    
+    This function:
+    1. Parses command line arguments to configure the pipeline
+    2. Creates a ProcessingPipeline instance with the specified parameters
+    3. Executes the appropriate pipeline steps based on user options
+    4. Handles different execution modes (full pipeline, partial steps, combine only)
+    5. Provides comprehensive logging and status reporting
+    
+    Pipeline Steps:
+    - Step 1: Preprocess raw tables (optional, can be skipped)
+    - Step 2: Join tables by year
+    - Step 3: Preprocess joined tables
+    - Step 4: Combine year-specific tables (optional, can be skipped)
+    
+    Returns:
+        int: Exit code (0 for success, 1 for failure)
+    """
     args = parse_arguments()
     
     # Override SCRIPT_DIR if --scripts_dir is provided

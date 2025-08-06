@@ -1,3 +1,51 @@
+"""
+DuckDB Manager Module
+
+This module provides a centralized interface for managing DuckDB database operations
+for privacy metrics calculations and data analysis. It encapsulates all database
+interactions and provides a clean, consistent API for the privacy evaluation framework.
+
+The module includes:
+- DuckDBManager: Main class for database management operations
+- get_database_list: List all available DuckDB databases
+- get_database_path: Get full path to database files
+- get_joined_tables: Retrieve joined tables from databases
+- get_common_tables: Find common tables between databases
+- load_table_data: Load table data into pandas DataFrames
+- get_table_column_info: Get column information for tables
+- execute_query: Execute custom SQL queries
+- get_table_count: Get row counts for tables
+- get_database_size: Get database file size
+- get_distinct_values: Get distinct values from columns
+
+Key Features:
+- Centralized database management for privacy metrics calculations
+- Support for multiple DuckDB databases
+- Automatic directory creation and validation
+- Comprehensive error handling and logging
+- Integration with pandas DataFrames
+- Efficient table and column information retrieval
+- Support for custom SQL queries
+- Database size and statistics reporting
+
+Database Operations:
+- Database discovery and listing
+- Table data loading and manipulation
+- Column information retrieval
+- Query execution and result handling
+- Database statistics and metadata
+
+Usage:
+    from duckdb_manager.duckdb_manager import DuckDBManager
+    
+    db_manager = DuckDBManager()
+    databases = db_manager.get_database_list()
+    df = db_manager.load_table_data(db_path, table_name)
+
+Author: [Your Name]
+Date: [Date]
+"""
+
 import duckdb
 import os
 import pandas as pd

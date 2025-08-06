@@ -1,3 +1,28 @@
+"""
+Health Claims Data Preprocessing Module
+
+This module provides comprehensive preprocessing functionality for health claims data
+stored in DuckDB databases. It handles missing value imputation, data cleaning, and
+preparation of individual tables before joining operations.
+
+The module includes:
+- DuckDBManager: A simplified database manager for standalone operations
+- HealthClaimsPreprocessor: Main class for preprocessing health claims data
+
+Key Features:
+- Automatic missing value imputation based on data type and column context
+- Table-specific preprocessing rules for different health data categories
+- Comprehensive logging and statistics tracking
+- Support for creating cleaned database copies
+
+Usage:
+    python preprocessing_before_join.py --db-path path/to/database.duckdb
+    python preprocessing_before_join.py --db-path path/to/database.duckdb --output-prefix "processed_"
+
+Author: [Your Name]
+Date: [Date]
+"""
+
 import argparse
 import sys
 import logging

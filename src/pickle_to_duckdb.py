@@ -1,3 +1,41 @@
+"""
+Pickle to DuckDB Conversion Module
+
+This module provides functionality to convert data stored in pickle files to DuckDB
+databases. It's particularly useful for converting data from R scripts or other
+sources that save data as pickle files to a more efficient database format.
+
+The module includes:
+- pickle_to_duckdb: Main function to convert pickle files to DuckDB databases
+- process_dataframe: Helper function to process individual dataframes and count missing values
+- main: Entry point for standalone execution
+
+Key Features:
+- Converts pickle files containing dictionaries of pandas DataFrames to DuckDB tables
+- Comprehensive missing value analysis and reporting
+- Automatic handling of different data types (NaN, empty strings, "NA" strings)
+- Detailed logging of conversion process
+- Support for both single DataFrame and dictionary of DataFrames
+- Automatic table creation in DuckDB database
+
+Data Processing Capabilities:
+- Missing value detection and counting
+- Data type validation
+- Table creation in DuckDB
+- Comprehensive reporting of data quality issues
+
+Usage:
+    # As a standalone script
+    python pickle_to_duckdb.py input.pkl output.duckdb
+    
+    # As a module
+    from pickle_to_duckdb import pickle_to_duckdb
+    pickle_to_duckdb('input.pkl', 'output.duckdb')
+
+Author: [Your Name]
+Date: [Date]
+"""
+
 import pickle
 import pandas as pd
 import duckdb
@@ -95,7 +133,25 @@ def pickle_to_duckdb(pickle_path, duckdb_path):
         else:
             print(f"{table_name}: No missing values")
 
-if __name__ == "__main__":
+def main():
+    """
+    Main function to run the pickle to DuckDB conversion as a standalone script.
+    
+    This function:
+    1. Parses command line arguments for input pickle file and output database path
+    2. Validates that the input file exists and is accessible
+    3. Converts the pickle file to a DuckDB database
+    4. Processes each DataFrame in the pickle file
+    5. Creates corresponding tables in the DuckDB database
+    6. Provides comprehensive reporting of missing values and data quality
+    
+    Command Line Arguments:
+    pickle_file_path: Path to the input pickle file (required)
+    output_duckdb_path: Path to the output DuckDB database (optional, auto-generated if not provided)
+    
+    Returns:
+        None: Results are printed to console and database is created
+    """
     if len(sys.argv) < 2:
         print("Usage: python script.py <pickle_file_path> [output_duckdb_path]")
         sys.exit(1)
@@ -109,3 +165,6 @@ if __name__ == "__main__":
         duckdb_path = str(Path(pickle_path).with_suffix('.duckdb'))
     
     pickle_to_duckdb(pickle_path, duckdb_path)
+
+if __name__ == "__main__":
+    main()

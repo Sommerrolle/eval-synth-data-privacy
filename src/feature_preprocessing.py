@@ -1,3 +1,51 @@
+"""
+Feature Preprocessing Module
+
+This module provides comprehensive feature preprocessing capabilities for health claims data,
+specifically designed to prepare data for privacy metrics calculations and machine learning
+analysis. It handles various data types including medical codes, timestamps, and categorical
+variables.
+
+The module includes:
+- FeaturePreprocessor: Main class for feature preprocessing operations
+- preprocess_dataframes: Preprocesses two dataframes for comparison
+- preprocess_single_dataframe: Preprocesses a single dataframe
+- encode_medical_codes: Converts medical diagnosis and procedure codes to numerical values
+- encode_atc_codes: Converts ATC drug codes to numerical values
+- convert_timestamps_to_epoch: Converts timestamp columns to Unix timestamps
+- categorize_columns: Categorizes columns as numeric or string based on content
+- get_sensitive_attributes_columns: Identifies sensitive attributes for privacy analysis
+
+Key Features:
+- Automatic detection and encoding of medical codes (ICD-10, procedure codes)
+- ATC drug code encoding for pharmaceutical data
+- Timestamp conversion to numerical format
+- Data type standardization and validation
+- Comprehensive logging of preprocessing steps
+- Support for both single dataframe and comparative preprocessing
+- Integration with privacy metrics calculations
+
+Data Types Handled:
+- Medical diagnosis codes (ICD-10)
+- Medical procedure codes
+- ATC drug classification codes
+- Timestamp and date fields
+- Categorical variables
+- Numerical variables
+
+Usage:
+    from feature_preprocessing import FeaturePreprocessor
+    
+    # Preprocess two dataframes for comparison
+    df1_processed, df2_processed, numeric_cols, string_cols = FeaturePreprocessor.preprocess_dataframes(df1, df2)
+    
+    # Preprocess a single dataframe
+    df_processed = FeaturePreprocessor.preprocess_single_dataframe(df)
+
+Author: [Your Name]
+Date: [Date]
+"""
+
 import numpy as np
 import pandas as pd
 import logging

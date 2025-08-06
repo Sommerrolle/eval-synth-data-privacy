@@ -1144,7 +1144,28 @@ def parse_arguments():
     return args
 
 def main():
-    """Main function to run the preprocessing script."""
+    """
+    Main function to run the joined tables preprocessing script.
+    
+    This function:
+    1. Parses command line arguments for database path, year, and output prefix
+    2. Creates a JoinedTablePreprocessor instance with the specified parameters
+    3. Preprocesses all joined tables for the specified year:
+       - join_YEAR_inpatient: Inpatient data preprocessing
+       - join_YEAR_outpatient: Outpatient data preprocessing
+       - join_YEAR_drugs: Pharmaceutical data preprocessing
+    4. Applies domain-specific imputation strategies for missing values
+    5. Generates comprehensive logging and statistics
+    6. Returns the names of processed tables
+    
+    Command Line Arguments:
+    --db_path: Path to the DuckDB database (required)
+    --year: Year of the joined tables (required)
+    --output_prefix: Prefix for cleaned tables (default: clean_)
+    
+    Returns:
+        Dict[str, str]: Dictionary mapping table types to processed table names
+    """
     # Parse command line arguments
     args = parse_arguments()
     

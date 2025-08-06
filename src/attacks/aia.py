@@ -1,3 +1,47 @@
+"""
+Attribute Inference Attack (AIA) Module
+
+This module implements Attribute Inference Attacks for evaluating the privacy protection
+of synthetic health data. It provides comprehensive attack strategies to assess how
+well synthetic data protects against attribute inference attacks using partial knowledge
+of quasi-identifiers.
+
+The module includes:
+- AttributeInferenceAttack: Main class for implementing AIA attacks
+- prepare_data_for_attack: Data preparation for attack scenarios
+- sample_overlapping_data: Sampling strategies for attack evaluation
+- partial_knowledge_attack: K-nearest neighbors based attack
+- machine_learning_attack: Machine learning based attack using Random Forest
+- evaluate_aia_vulnerability: Comprehensive vulnerability assessment
+- save_results: Utility function to save attack results
+
+Key Features:
+- Multiple attack strategies (k-NN, Random Forest)
+- Partial knowledge simulation (configurable knowledge ratios)
+- Overlapping data sampling for realistic attack scenarios
+- Comprehensive vulnerability assessment and risk scoring
+- Support for multiple sensitive attributes
+- Detailed attack result analysis and reporting
+- Integration with feature preprocessing pipeline
+
+Attack Strategies:
+- Partial Knowledge Attack: Uses k-nearest neighbors with limited quasi-identifier knowledge
+- Machine Learning Attack: Uses Random Forest classifier for attribute inference
+- Vulnerability Assessment: Comprehensive evaluation of attack success rates
+
+Usage:
+    from attacks.aia import AttributeInferenceAttack
+    
+    aia = AttributeInferenceAttack()
+    results = aia.evaluate_aia_vulnerability(
+        original_df, synthetic_df, 
+        quasi_identifiers, sensitive_attributes
+    )
+
+Author: [Your Name]
+Date: [Date]
+"""
+
 import numpy as np
 import pandas as pd
 import os

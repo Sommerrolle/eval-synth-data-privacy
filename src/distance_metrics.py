@@ -1,3 +1,40 @@
+"""
+Distance Metrics Calculator Module
+
+This module provides comprehensive distance-based privacy metrics calculation
+between original and synthetic datasets. It implements various distance measures
+and statistical analyses to assess the privacy protection quality of synthetic data.
+
+The module includes:
+- DistanceMetricsCalculator: Main class for calculating distance-based privacy metrics
+- calculate_metrics: Core function for computing distance metrics between datasets
+- plot_distance_distribution: Visualization of distance distributions
+- save_results: Utility function to save analysis results
+- get_sensitive_attributes_columns: Helper function to identify sensitive attributes
+
+Key Features:
+- Distance-based privacy metrics calculation
+- Support for multiple distance measures (Euclidean, Manhattan, etc.)
+- PCA-based dimensionality reduction for high-dimensional data
+- Statistical analysis of distance distributions
+- Visualization of distance metrics
+- Comprehensive logging and result storage
+- Integration with DuckDB for data management
+
+Distance Metrics Implemented:
+- Distance to Closest Record (DCR)
+- Distance to Closest Record within same class
+- Statistical analysis of distance distributions
+- Privacy risk assessment based on distance measures
+
+Usage:
+    python distance_metrics.py --db1 path/to/original.duckdb --db2 path/to/synthetic.duckdb --table table_name
+    python distance_metrics.py --db1 path/to/original.duckdb --db2 path/to/synthetic.duckdb --table table_name --sample-size 5000
+
+Author: [Your Name]
+Date: [Date]
+"""
+
 import numpy as np
 import pandas as pd
 from sklearn.compose import make_column_transformer
@@ -630,6 +667,27 @@ class DistanceMetricsCalculator:
 
 
 def main():
+    """
+    Main function to calculate distance-based privacy metrics between datasets.
+    
+    This function:
+    1. Parses command line arguments for database paths and parameters
+    2. Validates that the specified database files exist
+    3. Creates a DistanceMetricsCalculator instance
+    4. Calculates comprehensive distance metrics between original and synthetic datasets
+    5. Saves results to JSON file and generates visualizations
+    6. Provides privacy assessment based on calculated metrics
+    
+    Command Line Arguments:
+    --original: Path to original DuckDB database
+    --synthetic: Path to synthetic DuckDB database  
+    --table: Table name to compare
+    --sample_size: Maximum number of records to use (default: 10000)
+    --results_dir: Directory to save results (default: results/distance_metrics)
+    
+    Returns:
+        None: Results are printed to console and saved to file
+    """
     parser = argparse.ArgumentParser(description='Calculate privacy metrics between original and synthetic datasets')
     parser.add_argument('--original', required=True, help='Path to original DuckDB database')
     parser.add_argument('--synthetic', required=True, help='Path to synthetic DuckDB database')

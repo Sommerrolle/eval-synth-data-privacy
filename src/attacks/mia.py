@@ -1,12 +1,48 @@
 #!/usr/bin/env python3
 """
-Distance-based Membership Inference Attack (MIA) for synthetic health data evaluation.
+Membership Inference Attack (MIA) Module
 
-This script implements a membership inference attack where:
-1. Given a real patient record r and synthetic dataset S, find closest synthetic record s
-2. Calculate distance d(r,s) 
-3. Classify r as member of training set if d(r,s) < threshold
-4. Evaluate attack success using holdout test data with known membership labels
+This module implements distance-based Membership Inference Attacks for evaluating the privacy
+protection of synthetic health data. It assesses whether an attacker can determine if a
+specific record was used in training the synthetic data generation model.
+
+The module includes:
+- MembershipInferenceAttack: Main class for implementing MIA attacks
+- prepare_attack_data: Data preparation with balanced sampling
+- preprocess_features: Feature preprocessing and encoding
+- calculate_distances_to_synthetic: Distance calculation to synthetic records
+- optimize_threshold: Threshold optimization for attack classification
+- evaluate_attack: Comprehensive attack evaluation and metrics
+- plot_distance_distributions: Visualization of attack results
+- run_membership_inference_attack: Complete attack pipeline
+- save_results: Utility function to save attack results
+
+Key Features:
+- Distance-based membership inference using nearest neighbor approach
+- Balanced sampling of training and holdout datasets
+- Multiple distance metrics (Euclidean, Manhattan, etc.)
+- Threshold optimization using various metrics (F1, precision, recall)
+- Comprehensive attack evaluation with multiple performance metrics
+- Visualization of distance distributions
+- Support for large-scale datasets with efficient sampling
+- Integration with feature preprocessing pipeline
+
+Attack Methodology:
+1. Calculate distances from real records to nearest synthetic records
+2. Optimize classification threshold using holdout data
+3. Evaluate attack success using known membership labels
+4. Generate comprehensive performance metrics and visualizations
+
+Usage:
+    from attacks.mia import MembershipInferenceAttack
+    
+    mia = MembershipInferenceAttack()
+    results = mia.run_membership_inference_attack(
+        training_data, holdout_data, synthetic_data, feature_columns
+    )
+
+Author: [Your Name]
+Date: [Date]
 """
 
 import os
@@ -721,7 +757,31 @@ class MembershipInferenceAttack:
 
 
 def main():
-    """Main function to demonstrate MIA usage."""
+    """
+    Main function to run Membership Inference Attack evaluation.
+    
+    This function:
+    1. Parses command line arguments for database paths and parameters
+    2. Initializes the DuckDB manager and MIA evaluator
+    3. Defines feature columns based on table type (inpatient, outpatient, drugs)
+    4. Loads original and synthetic datasets from databases
+    5. Splits original data into training (80%) and holdout (20%) sets
+    6. Runs comprehensive membership inference attack evaluation
+    7. Saves results and generates visualizations
+    
+    Command Line Arguments:
+    --original_db: Original database name (required)
+    --synthetic_db: Synthetic database name (required)
+    --table: Table name to analyze (required)
+    --training_table: Training table name (optional, if different from --table)
+    --target_sample_per_set: Target sample size per dataset (default: 40000)
+    --synthetic_multiplier: Synthetic dataset size multiplier (default: 1.5)
+    --dataset_specific_limit: Dataset-specific limit for synthetic sample size (optional)
+    --results_dir: Results directory (default: results/mia_attacks)
+    
+    Returns:
+        None: Results are printed to console and saved to files
+    """
     import argparse
     
     parser = argparse.ArgumentParser(description='Run Membership Inference Attack on synthetic health data')

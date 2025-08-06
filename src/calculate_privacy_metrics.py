@@ -266,70 +266,7 @@ class PrivacyMetricsCalculator:
             "privacy_score": float(privacy_score)
         }
     
-    # def sample_data_using_duckdb(self, db_path: str, table_name: str, sample_size: int) -> pd.DataFrame:
-    #     """
-    #     Sample data from a table using DuckDB's sampling capabilities.
-        
-    #     Args:
-    #         db_path: Path to the database
-    #         table_name: Name of the table to sample from
-    #         sample_size: Desired number of samples
-            
-    #     Returns:
-    #         DataFrame containing the sampled data
-    #     """
-    #     # Get the total row count first
-    #     total_count = self.db_manager.get_table_count(db_path, table_name)
-        
-    #     if sample_size >= total_count:
-    #         # If sample size is larger than or equal to total count, just load the entire table
-    #         df = self.db_manager.load_table_data(db_path, table_name)
-    #         logging.info(f"Loaded entire table with {len(df):,} rows")
-    #         return df
-        
-    #     # Try using TABLESAMPLE to get a random sample
-    #     sampling_percentage = (sample_size / total_count) * 100
-    #     query = f"SELECT * FROM {table_name} USING SAMPLE {sampling_percentage}% (reservoir)"
-        
-    #     try:
-    #         result = self.db_manager.execute_query(db_path, query)
-    #         df = pd.DataFrame(result)
-            
-    #         # Check if we got approximately the right number of rows
-    #         if len(df) < sample_size * 0.9:
-    #             logging.warning(f"Sample size too small: requested {sample_size}, got {len(df)}")
-                
-    #             # Try using ORDER BY RANDOM() LIMIT instead
-    #             query = f"SELECT * FROM {table_name} ORDER BY RANDOM() LIMIT {sample_size}"
-    #             result = self.db_manager.execute_query(db_path, query)
-    #             df = pd.DataFrame(result)
-    #             logging.info(f"Resampled to {len(df):,} rows using RANDOM() LIMIT")
-    #         elif len(df) > sample_size * 1.1:
-    #             logging.warning(f"Sample size too large: requested {sample_size}, got {len(df)}")
-    #             # If we got too many rows, subsample using pandas
-    #             df = df.sample(n=sample_size, random_state=42).reset_index(drop=True)
-    #             logging.info(f"Subsampled to {len(df):,} rows using pandas")
-                
-    #         # Check for duplicates
-    #         duplicates = df.duplicated().sum()
-    #         logging.info(f"Duplicates in sampled data: {duplicates:,}")
-            
-    #         return df
-        
-    #     except Exception as e:
-    #         logging.error(f"Error sampling data: {str(e)}")
-    #         # Fall back to loading the entire table and sampling with pandas
-    #         logging.info("Falling back to loading entire table and sampling with pandas")
-    #         df = self.db_manager.load_table_data(db_path, table_name)
-            
-    #         if len(df) > sample_size:
-    #             df = df.sample(n=sample_size, random_state=42).reset_index(drop=True)
-    #             logging.info(f"Sampled to {len(df):,} rows using pandas")
-            
-    #         duplicates = df.duplicated().sum()
-    #         logging.info(f"Duplicates in sampled data: {duplicates:,}")
-            
-    #         return df
+ 
 
     def analyze_table(self, db_path: str, table_name: str) -> Dict:
         """

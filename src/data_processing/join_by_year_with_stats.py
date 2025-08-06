@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Script to join health claims tables across all years and create three comprehensive tables:
-1. join_all_inpatient
-2. join_all_outpatient
-3. join_all_drugs
+Script to join health claims tables by specified year and create three comprehensive tables:
+1. join_YEAR_inpatient
+2. join_YEAR_outpatient
+3. join_YEAR_drugs
 
 This script combines the insurants and insurance_data tables with other domain-specific
-tables, ensuring that events occur within the insurance period.
+tables, filtering for records from a specified year.
 """
 
 import os
@@ -29,17 +29,18 @@ logging.basicConfig(
     ]
 )
 
-def create_inpatient_join(conn):
+def create_inpatient_join(conn, year):
     """
-    Create a comprehensive inpatient data join across all years.
+    Create a comprehensive inpatient data join for a specific year.
     
     Args:
         conn: DuckDB connection
+        year: Year to filter data by
     
     Returns:
         Name of the created table
     """
-    table_name = "join_all_inpatient"
+    table_name = f"join_{year}_inpatient"
     logging.info(f"Creating {table_name} table...")
     
     # Create the join query
@@ -77,31 +78,33 @@ def create_inpatient_join(conn):
         insurants ins
     JOIN 
         insurance_data insd ON ins.pid = insd.pid
+        AND EXTRACT(YEAR FROM insd.insurance_data_from) <= {year} 
+        AND (insd.insurance_data_to IS NULL OR EXTRACT(YEAR FROM insd.insurance_data_to) >= {year})
     LEFT JOIN 
         inpatient_cases ic ON ins.pid = ic.pid
         AND (
-            -- Event occurs within insurance period
-            ic.inpatient_cases_date_of_admission >= insd.insurance_data_from
-            AND (ic.inpatient_cases_date_of_admission <= insd.insurance_data_to OR insd.insurance_data_to IS NULL)
+            EXTRACT(YEAR FROM ic.inpatient_cases_date_of_admission) = {year}
+            OR EXTRACT(YEAR FROM ic.inpatient_cases_date_of_discharge) = {year}
+            OR (
+                ic.inpatient_cases_date_of_admission IS NOT NULL
+                AND ic.inpatient_cases_date_of_discharge IS NULL
+                AND EXTRACT(YEAR FROM ic.inpatient_cases_date_of_admission) <= {year}
+            )
         )
     LEFT JOIN 
         inpatient_diagnosis id ON ic.pid = id.pid AND ic.inpatient_caseID = id.inpatient_caseID
     LEFT JOIN 
         inpatient_procedures ip ON ic.pid = ip.pid AND ic.inpatient_caseID = ip.inpatient_caseID
         AND (
-            -- Procedure occurs within insurance period
-            (ip.inpatient_procedures_date_of_procedure IS NULL OR 
-             (ip.inpatient_procedures_date_of_procedure >= insd.insurance_data_from
-              AND (ip.inpatient_procedures_date_of_procedure <= insd.insurance_data_to OR insd.insurance_data_to IS NULL)))
+            ip.inpatient_procedures_date_of_procedure IS NULL
+            OR EXTRACT(YEAR FROM ip.inpatient_procedures_date_of_procedure) = {year}
         )
     LEFT JOIN 
         inpatient_fees ifees ON ic.pid = ifees.pid AND ic.inpatient_caseID = ifees.inpatient_caseID
         AND (
-            -- Fee period overlaps with insurance period
-            (ifees.inpatient_fees_from >= insd.insurance_data_from OR insd.insurance_data_from IS NULL OR ifees.inpatient_fees_from IS NULL)
-            AND (ifees.inpatient_fees_from <= insd.insurance_data_to OR insd.insurance_data_to IS NULL OR ifees.inpatient_fees_from IS NULL)
-            OR (ifees.inpatient_fees_to >= insd.insurance_data_from OR insd.insurance_data_from IS NULL OR ifees.inpatient_fees_to IS NULL)
-            AND (ifees.inpatient_fees_to <= insd.insurance_data_to OR insd.insurance_data_to IS NULL OR ifees.inpatient_fees_to IS NULL)
+            ifees.inpatient_fees_from IS NULL
+            OR EXTRACT(YEAR FROM ifees.inpatient_fees_from) = {year}
+            OR EXTRACT(YEAR FROM ifees.inpatient_fees_to) = {year}
         )
     ORDER BY 
         ins.pid, 
@@ -127,9 +130,7 @@ def create_inpatient_join(conn):
         COUNT(DISTINCT CASE WHEN inpatient_caseID IS NOT NULL THEN pid END) as patients_with_cases,
         COUNT(DISTINCT CASE WHEN inpatient_diagnosis_diagnosis IS NOT NULL THEN pid END) as patients_with_diagnoses,
         COUNT(DISTINCT CASE WHEN inpatient_procedures_procedure_code IS NOT NULL THEN pid END) as patients_with_procedures,
-        COUNT(DISTINCT CASE WHEN inpatient_fees_billing_code IS NOT NULL THEN pid END) as patients_with_fees,
-        MIN(inpatient_cases_date_of_admission) as earliest_admission,
-        MAX(inpatient_cases_date_of_admission) as latest_admission
+        COUNT(DISTINCT CASE WHEN inpatient_fees_billing_code IS NOT NULL THEN pid END) as patients_with_fees
     FROM
         {table_name}
     """
@@ -146,17 +147,18 @@ def create_inpatient_join(conn):
     
     return table_name
 
-def create_outpatient_join(conn):
+def create_outpatient_join(conn, year):
     """
-    Create a comprehensive outpatient data join across all years.
+    Create a comprehensive outpatient data join for a specific year.
     
     Args:
         conn: DuckDB connection
+        year: Year to filter data by
     
     Returns:
         Name of the created table
     """
-    table_name = "join_all_outpatient"
+    table_name = f"join_{year}_outpatient"
     logging.info(f"Creating {table_name} table...")
     
     # Create the join query
@@ -194,30 +196,28 @@ def create_outpatient_join(conn):
         insurants ins
     JOIN 
         insurance_data insd ON ins.pid = insd.pid
+        AND EXTRACT(YEAR FROM insd.insurance_data_from) <= {year} 
+        AND (insd.insurance_data_to IS NULL OR EXTRACT(YEAR FROM insd.insurance_data_to) >= {year})
     LEFT JOIN 
         outpatient_cases oc ON ins.pid = oc.pid
         AND (
-            -- Case period overlaps with insurance period
-            (oc.outpatient_cases_from >= insd.insurance_data_from OR insd.insurance_data_from IS NULL OR oc.outpatient_cases_from IS NULL)
-            AND (oc.outpatient_cases_from <= insd.insurance_data_to OR insd.insurance_data_to IS NULL OR oc.outpatient_cases_from IS NULL)
-            OR (oc.outpatient_cases_to >= insd.insurance_data_from OR insd.insurance_data_from IS NULL OR oc.outpatient_cases_to IS NULL)
-            AND (oc.outpatient_cases_to <= insd.insurance_data_to OR insd.insurance_data_to IS NULL OR oc.outpatient_cases_to IS NULL)
+            oc.outpatient_cases_year = {year}
+            OR (EXTRACT(YEAR FROM oc.outpatient_cases_from) = {year})
+            OR (EXTRACT(YEAR FROM oc.outpatient_cases_to) = {year})
         )
     LEFT JOIN 
         outpatient_diagnosis od ON oc.pid = od.pid AND oc.outpatient_caseID = od.outpatient_caseID
     LEFT JOIN 
         outpatient_procedures op ON oc.pid = op.pid AND oc.outpatient_caseID = op.outpatient_caseID
         AND (
-            -- Procedure occurs within insurance period
-            (op.outpatient_procedures_date_of_procedure >= insd.insurance_data_from OR insd.insurance_data_from IS NULL OR op.outpatient_procedures_date_of_procedure IS NULL)
-            AND (op.outpatient_procedures_date_of_procedure <= insd.insurance_data_to OR insd.insurance_data_to IS NULL OR op.outpatient_procedures_date_of_procedure IS NULL)
+            op.outpatient_procedures_date_of_procedure IS NULL
+            OR EXTRACT(YEAR FROM op.outpatient_procedures_date_of_procedure) = {year}
         )
     LEFT JOIN 
         outpatient_fees ofees ON oc.pid = ofees.pid AND oc.outpatient_caseID = ofees.outpatient_caseID
         AND (
-            -- Fee occurs within insurance period
-            (ofees.outpatient_fees_date >= insd.insurance_data_from OR insd.insurance_data_from IS NULL OR ofees.outpatient_fees_date IS NULL)
-            AND (ofees.outpatient_fees_date <= insd.insurance_data_to OR insd.insurance_data_to IS NULL OR ofees.outpatient_fees_date IS NULL)
+            ofees.outpatient_fees_date IS NULL
+            OR EXTRACT(YEAR FROM ofees.outpatient_fees_date) = {year}
         )
     ORDER BY 
         ins.pid, 
@@ -243,11 +243,7 @@ def create_outpatient_join(conn):
         COUNT(DISTINCT CASE WHEN outpatient_caseID IS NOT NULL THEN pid END) as patients_with_cases,
         COUNT(DISTINCT CASE WHEN outpatient_diagnosis_diagnosis IS NOT NULL THEN pid END) as patients_with_diagnoses,
         COUNT(DISTINCT CASE WHEN outpatient_procedures_procedure_code IS NOT NULL THEN pid END) as patients_with_procedures,
-        COUNT(DISTINCT CASE WHEN outpatient_fees_billing_code IS NOT NULL THEN pid END) as patients_with_fees,
-        MIN(outpatient_cases_from) as earliest_case,
-        MAX(outpatient_cases_to) as latest_case,
-        MIN(outpatient_cases_year) as earliest_year,
-        MAX(outpatient_cases_year) as latest_year
+        COUNT(DISTINCT CASE WHEN outpatient_fees_billing_code IS NOT NULL THEN pid END) as patients_with_fees
     FROM
         {table_name}
     """
@@ -264,17 +260,18 @@ def create_outpatient_join(conn):
     
     return table_name
 
-def create_drugs_join(conn):
+def create_drugs_join(conn, year):
     """
-    Create a drugs data join across all years.
+    Create a drugs data join for a specific year.
     
     Args:
         conn: DuckDB connection
+        year: Year to filter data by
     
     Returns:
         Name of the created table
     """
-    table_name = "join_all_drugs"
+    table_name = f"join_{year}_drugs"
     logging.info(f"Creating {table_name} table...")
     
     # Create the join query
@@ -302,16 +299,13 @@ def create_drugs_join(conn):
         insurants ins
     JOIN 
         insurance_data insd ON ins.pid = insd.pid
+        AND EXTRACT(YEAR FROM insd.insurance_data_from) <= {year} 
+        AND (insd.insurance_data_to IS NULL OR EXTRACT(YEAR FROM insd.insurance_data_to) >= {year})
     LEFT JOIN 
         drugs d ON ins.pid = d.pid
         AND (
-            -- Drug dispensed within insurance period
-            (d.drugs_date_of_dispense >= insd.insurance_data_from OR insd.insurance_data_from IS NULL OR d.drugs_date_of_dispense IS NULL)
-            AND (d.drugs_date_of_dispense <= insd.insurance_data_to OR insd.insurance_data_to IS NULL OR d.drugs_date_of_dispense IS NULL)
-            OR
-            -- Drug prescribed within insurance period
-            (d.drugs_date_of_prescription >= insd.insurance_data_from OR insd.insurance_data_from IS NULL OR d.drugs_date_of_prescription IS NULL)
-            AND (d.drugs_date_of_prescription <= insd.insurance_data_to OR insd.insurance_data_to IS NULL OR d.drugs_date_of_prescription IS NULL)
+            EXTRACT(YEAR FROM d.drugs_date_of_dispense) = {year}
+            OR EXTRACT(YEAR FROM d.drugs_date_of_prescription) = {year}
         )
     WHERE
         d.drugs_date_of_dispense IS NOT NULL
@@ -386,7 +380,7 @@ def get_table_row_counts(conn):
     
     return row_counts
 
-def save_row_counts_to_csv(db_path, row_counts, csv_filename="table_counts.csv"):
+def save_row_counts_to_csv(db_path, row_counts, year=None, csv_filename="table_counts.csv"):
     """
     Save table row counts to a CSV file, appending to existing file if it exists.
     If a row for the database already exists, it will be updated.
@@ -394,6 +388,7 @@ def save_row_counts_to_csv(db_path, row_counts, csv_filename="table_counts.csv")
     Args:
         db_path: Path to the database
         row_counts: Dictionary with table names as keys and row counts as values
+        year: Optional year filter used for joined tables
         csv_filename: Name of the CSV file to save to
         
     Returns:
@@ -406,12 +401,13 @@ def save_row_counts_to_csv(db_path, row_counts, csv_filename="table_counts.csv")
     joined_tables = sorted([table for table in row_counts.keys() if table.startswith('join_')])
     all_columns = base_tables + joined_tables
     
-    # Ensure the three main joined tables are represented
-    for table_type in ['inpatient', 'outpatient', 'drugs']:
-        table_name = f"join_all_{table_type}"
-        if table_name not in all_columns:
-            all_columns.append(table_name)
-            row_counts[table_name] = 0  # Use 0 to indicate table doesn't exist
+    # If year is provided, ensure the three main joined tables are represented
+    if year is not None:
+        for table_type in ['inpatient', 'outpatient', 'drugs']:
+            table_name = f"join_{year}_{table_type}"
+            if table_name not in all_columns:
+                all_columns.append(table_name)
+                row_counts[table_name] = 0  # Use 0 to indicate table doesn't exist
     
     # Check if file exists and load it
     if os.path.exists(csv_filename):
@@ -500,12 +496,13 @@ def check_database_tables(conn):
     
     return True
 
-def create_joined_tables(db_path, csv_path="table_counts.csv"):
+def create_joined_tables(db_path, year, csv_path="table_counts.csv"):
     """
-    Create the three joined tables across all years.
+    Create the three joined tables for a specific year.
     
     Args:
         db_path: Path to the DuckDB database
+        year: Year to filter data by
         csv_path: Path to the CSV file for row counts
         
     Returns:
@@ -529,15 +526,15 @@ def create_joined_tables(db_path, csv_path="table_counts.csv"):
         initial_row_counts = get_table_row_counts(conn)
         
         # Create the three joined tables
-        inpatient_table = create_inpatient_join(conn)
-        outpatient_table = create_outpatient_join(conn)
-        drugs_table = create_drugs_join(conn)
+        inpatient_table = create_inpatient_join(conn, year)
+        outpatient_table = create_outpatient_join(conn, year)
+        drugs_table = create_drugs_join(conn, year)
         
         # Get updated row counts (after creating new tables)
         final_row_counts = get_table_row_counts(conn)
         
         # Save row counts to CSV
-        csv_file = save_row_counts_to_csv(db_path, final_row_counts, csv_path)
+        csv_file = save_row_counts_to_csv(db_path, final_row_counts, year, csv_path)
         logging.info(f"Table row counts saved to {csv_file}")
         
         return {
@@ -555,9 +552,31 @@ def create_joined_tables(db_path, csv_path="table_counts.csv"):
         conn.close()
 
 def main():
-    """Main function to run the table joining script."""
-    parser = argparse.ArgumentParser(description='Create joined tables for health claims data across all years')
+    """
+    Main function to run the year-specific table joining script.
+    
+    This function:
+    1. Parses command line arguments for database path, year, and options
+    2. Validates that the specified database file exists
+    3. Creates three comprehensive joined tables for the specified year:
+       - join_YEAR_inpatient: Inpatient data with diagnoses, procedures, and fees for the year
+       - join_YEAR_outpatient: Outpatient data with diagnoses, procedures, and fees for the year
+       - join_YEAR_drugs: Pharmaceutical data with ATC codes and prescriber info for the year
+    4. Generates row count statistics for all tables
+    5. Saves table statistics to CSV file for analysis
+    
+    Command Line Arguments:
+    --db_path: Path to the DuckDB database (required)
+    --year: Year to filter data by (required)
+    --count_only: Only count rows without creating joined tables (optional)
+    --csv_path: Path to the CSV file for row counts (default: table_counts.csv)
+    
+    Returns:
+        None: Results are printed to console and saved to files
+    """
+    parser = argparse.ArgumentParser(description='Create joined tables for health claims data by year')
     parser.add_argument('--db_path', required=True, help='Path to the DuckDB database')
+    parser.add_argument('--year', type=int, required=True, help='Year to filter data by')
     parser.add_argument('--count_only', action='store_true', help='Only count rows without creating joined tables')
     parser.add_argument('--csv_path', default='table_counts.csv', help='Path to the CSV file for row counts (default: table_counts.csv)')
     
@@ -565,7 +584,7 @@ def main():
     
     # Print banner
     print("\n" + "=" * 80)
-    print(f"Health Claims Data Table Joiner - All Years")
+    print(f"Health Claims Data Table Joiner - Year: {args.year}")
     print("=" * 80 + "\n")
     
     # If count_only flag is set, just get the row counts without creating joins
@@ -579,12 +598,12 @@ def main():
         row_counts = get_table_row_counts(conn)
         conn.close()
         
-        csv_path = save_row_counts_to_csv(args.db_path, row_counts, args.csv_path)
+        csv_path = save_row_counts_to_csv(args.db_path, row_counts, args.year, args.csv_path)
         print(f"\nTable row counts saved to {csv_path}")
         return
     
     # Create the joined tables
-    tables = create_joined_tables(db_path=args.db_path, csv_path=args.csv_path)
+    tables = create_joined_tables(db_path=args.db_path, year=args.year, csv_path=args.csv_path)
     
     if tables:
         print("\nSuccessfully created the following tables:")

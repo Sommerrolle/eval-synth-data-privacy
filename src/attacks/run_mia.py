@@ -1,3 +1,44 @@
+"""
+Membership Inference Attack (MIA) Runner Module
+
+This module provides a focused testing framework for running Membership Inference Attacks
+on health claims data, specifically designed to evaluate whether synthetic data can be
+used to determine if a specific record was part of the training dataset.
+
+The module includes:
+- test_membership_inference: Main function for testing membership inference attacks
+- test_multiple_synthetic_datasets: Function for testing multiple synthetic datasets
+- MIA_SAMPLE_CONFIGS: Configuration for different sample sizes and dataset limits
+
+Key Features:
+- Distance-based membership inference using nearest neighbor approach
+- Support for separate training and holdout databases
+- Configurable sample sizes for different synthetic datasets
+- Comprehensive attack evaluation with multiple performance metrics
+- Visualization of distance distributions
+- Integration with DuckDB manager for data loading
+- Detailed analysis of attack success rates
+
+Attack Methodology:
+1. Calculate distances from real records to nearest synthetic records
+2. Optimize classification threshold using holdout data
+3. Evaluate attack success using known membership labels
+4. Generate comprehensive performance metrics and visualizations
+
+Usage:
+    python run_mia.py
+    # Modify the configuration variables to test different datasets
+
+Configuration:
+- TRAINING_DB: Training database (members)
+- HOLDOUT_DB: Holdout database (non-members)
+- SYNTHETIC_DB: Synthetic database to test
+- TABLE_NAME: Table to analyze
+- feature_columns: List of feature columns for distance calculation
+
+Author: [Your Name]
+Date: [Date]
+"""
 #!/usr/bin/env python3
 """
 Focused MIA test for membership inference attack evaluation
@@ -24,7 +65,33 @@ MIA_SAMPLE_CONFIGS = {
 
 def test_membership_inference():
     """
-    Simplified test focusing on membership inference attack evaluation
+    Main function to test Membership Inference Attacks on health claims data.
+    
+    This function:
+    1. Configures logging and initializes MIA evaluator and database manager
+    2. Sets up test parameters for membership inference evaluation
+    3. Loads training, holdout, and synthetic datasets from separate databases
+    4. Validates that all required feature columns exist in all datasets
+    5. Determines dataset-specific sample size limits based on synthetic database
+    6. Runs comprehensive MIA evaluation with distance-based approach
+    7. Provides detailed analysis of attack performance and vulnerability assessment
+    8. Saves results and generates visualizations
+    
+    Test Configuration:
+    - Training Database: claims_data.duckdb (members)
+    - Holdout Database: cle_test.duckdb (non-members)
+    - Synthetic Database: limebit_mtgan.duckdb (configurable)
+    - Table: clean_join_2017_inpatient
+    - Feature Columns: 7 demographic, admission, and medical code fields
+    
+    Attack Methodology:
+    - Distance-based membership inference using nearest neighbor approach
+    - Threshold optimization using holdout data
+    - Multiple performance metrics (accuracy, precision, recall, F1, AUC)
+    - Visualization of distance distributions
+    
+    Returns:
+        None: Results are printed to console and saved to file
     """
     
     # Configure logging

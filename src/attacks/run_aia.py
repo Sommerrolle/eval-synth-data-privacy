@@ -1,3 +1,43 @@
+"""
+Attribute Inference Attack (AIA) Runner Module
+
+This module provides a focused testing framework for running Attribute Inference Attacks
+on health claims data, specifically designed to evaluate the privacy protection of
+synthetic data against attribute inference attacks.
+
+The module includes:
+- test_inpatient_aia: Main function for testing inpatient diagnosis and procedure inference
+- AIA_SAMPLE_CONFIGS: Configuration for different sample sizes based on dataset
+- SAMPLE_SIZE: Default sample size for AIA testing
+
+Key Features:
+- Focused testing on specific sensitive attributes (diagnosis codes, procedure codes)
+- Configurable sample sizes for different synthetic datasets
+- Comprehensive logging and result reporting
+- Integration with DuckDB manager for data loading
+- Support for multiple synthetic data sources
+- Detailed analysis of attack success rates
+
+Attack Focus:
+- Inpatient diagnosis code inference
+- Inpatient procedure code inference
+- Multiple knowledge ratio testing
+- Comprehensive vulnerability assessment
+
+Usage:
+    python run_aia.py
+    # Modify the configuration variables to test different datasets and attributes
+
+Configuration:
+- ORIGINAL_DB: Original database name
+- SYNTHETIC_DB: Synthetic database name to test
+- TABLE_NAME: Table to analyze
+- quasi_identifiers: List of quasi-identifier columns
+- sensitive_attributes: List of sensitive attributes to test
+
+Author: [Your Name]
+Date: [Date]
+"""
 #!/usr/bin/env python3
 """
 Focused AIA test for inpatient diagnosis and procedure code inference
@@ -27,7 +67,32 @@ SAMPLE_SIZE = 50000
 
 def test_inpatient_aia():
     """
-    Test focusing on both inpatient diagnosis and procedure code inference
+    Main function to test Attribute Inference Attacks on inpatient data.
+    
+    This function:
+    1. Configures logging and initializes AIA evaluator and database manager
+    2. Sets up test parameters for inpatient diagnosis and procedure inference
+    3. Loads original and synthetic datasets from DuckDB databases
+    4. Validates that all required columns exist in both datasets
+    5. Analyzes sensitive attribute distributions before filtering
+    6. Runs comprehensive AIA evaluation with multiple attack strategies
+    7. Provides detailed analysis of attack success rates and vulnerability assessment
+    8. Saves results to JSON file with comprehensive reporting
+    
+    Test Configuration:
+    - Original Database: claims_data.duckdb
+    - Synthetic Database: cprd_bn.duckdb (configurable)
+    - Table: clean_join_2017_inpatient
+    - Sensitive Attributes: inpatient_diagnosis_diagnosis, inpatient_procedures_procedure_code
+    - Quasi-Identifiers: 5 demographic and admission-related fields
+    
+    Attack Strategies:
+    - k-NN based attacks with varying knowledge ratios
+    - Machine learning attacks using Random Forest
+    - Multiple sampling strategies for realistic attack scenarios
+    
+    Returns:
+        None: Results are printed to console and saved to file
     """
     
     # Configure logging

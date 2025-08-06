@@ -50,7 +50,7 @@ def generate_output_table_name(selected_tables: List[str]) -> str:
     numbers = [TABLE_MAPPING[table] for table in selected_tables]
     return 'joined_' + '_'.join(str(n) for n in sorted(numbers))
 
-def analyze_join_complexity(con: duckdb.DuckDBPyConnection, keys: Dict[str, List[str]], 
+def analyze_join_complexity(con, keys: Dict[str, List[str]], 
                           primary_table: str = 'insurants') -> Dict:
     """Analyze the complexity of the join operation."""
     analysis = {}

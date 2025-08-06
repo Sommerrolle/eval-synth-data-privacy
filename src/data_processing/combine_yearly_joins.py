@@ -281,7 +281,30 @@ def create_combined_tables(db_path, input_prefix="", output_prefix="", filter_ye
         conn.close()
 
 def main():
-    """Main function to run the table combining script."""
+    """
+    Main function to run the yearly table combining script.
+    
+    This function:
+    1. Parses command line arguments for database path, prefixes, and year filtering
+    2. Identifies all year-specific joined tables in the database
+    3. Combines tables by category using UNION ALL operations:
+       - Inpatient tables → all_inpatient
+       - Outpatient tables → all_outpatient
+       - Drugs tables → all_drugs
+    4. Optionally filters tables by specific years
+    5. Generates row count statistics for combined tables
+    6. Saves table statistics to CSV file
+    
+    Command Line Arguments:
+    --db_path: Path to the DuckDB database (required)
+    --input_prefix: Prefix of input tables to combine (default: "clean_")
+    --output_prefix: Prefix for output combined tables (default: "")
+    --years: Years to include (space-separated, e.g., 2018 2019 2020)
+    --csv_path: Path to the CSV file for row counts (default: table_counts.csv)
+    
+    Returns:
+        None: Results are printed to console and saved to files
+    """
     parser = argparse.ArgumentParser(description='Combine yearly joined tables into comprehensive tables')
     parser.add_argument('--db_path', required=True, help='Path to the DuckDB database')
     parser.add_argument('--input_prefix', default="clean_", help='Prefix of input tables to combine (default: "clean_")')
